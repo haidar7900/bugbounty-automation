@@ -1,0 +1,7 @@
+.env
+config/.env
+reports/
+*.log
+*.tmp
+__pycache__/
+tools/
