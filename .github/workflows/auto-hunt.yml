@@ -1,16 +1,29 @@
 name: 🤖 Full Auto Hunt (Fire & Forget)
 on:
   schedule:
-    - cron: '0 */6 * * *'   # يشتغل كل 6 ساعات
-  workflow_dispatch:        # تشغيل يدوي بالضغطة
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 jobs:
   hunt:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Install Tools (Subfinder, Httpx, Nuclei)
+
+      # 🔥 الخطوة السحرية: استرجاع أو حفظ الأدوات في الكاش
+      - name: Cache Go Binaries
+        uses: actions/cache@v4
+        id: cache-go
+        with:
+          path: |
+            ~/go/bin
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install Tools (Only if not cached)
+        if: steps.cache-go.outputs.cache-hit != 'true'
         run: |
           sudo apt update
           sudo apt install -y git golang-go python3-pip jq
@@ -19,6 +32,12 @@ jobs:
           go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
           echo "export PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
 
+      # إذا كان الكاش موجود، نحتاج فقط نضيف الـ PATH
+      - name: Set PATH for cached tools
+        if: steps.cache-go.outputs.cache-hit == 'true'
+        run: |
+          echo "export PATH=$PATH:~/go/bin" >> $GITHUB_ENV
+
       - name: 🔥 Run Auto Scan on ALL targets in config/targets.txt
         run: |
           mkdir -p reports
@@ -26,39 +45,26 @@ jobs:
           echo "**Date:** $(date)" >> reports/FINAL_REPORT.md
           echo "" >> reports/FINAL_REPORT.md
           
-          # حلقة تمر على كل هدف في ملف targets.txt
           while read target; do
             echo "========================================" >> reports/FINAL_REPORT.md
             echo "🎯 Scanning Target: $target" | tee -a reports/FINAL_REPORT.md
             echo "========================================" >> reports/FINAL_REPORT.md
             
-            echo "[1/3] Finding subdomains for $target..."
             subfinder -d $target -silent -o reports/sub_$target.txt
-            
-            echo "[2/3] Filtering alive hosts..."
             httpx -l reports/sub_$target.txt -silent -o reports/alive_$target.txt
-            
-            echo "[3/3] Scanning with Nuclei..."
             nuclei -l reports/alive_$target.txt -severity low,medium,high,critical -o reports/nuclei_$target.txt
             
-            # نلصق نتائج هذا الهدف في التقرير النهائي
             echo "### 🔍 Subdomains Found:" >> reports/FINAL_REPORT.md
             cat reports/sub_$target.txt >> reports/FINAL_REPORT.md 2>/dev/null || echo "None" >> reports/FINAL_REPORT.md
-            
             echo "### 🟢 Alive Hosts:" >> reports/FINAL_REPORT.md
             cat reports/alive_$target.txt >> reports/FINAL_REPORT.md 2>/dev/null || echo "None" >> reports/FINAL_REPORT.md
-            
             echo "### 🚨 Nuclei Vulnerabilities:" >> reports/FINAL_REPORT.md
             cat reports/nuclei_$target.txt >> reports/FINAL_REPORT.md 2>/dev/null || echo "No vulnerabilities found" >> reports/FINAL_REPORT.md
-            
             echo "" >> reports/FINAL_REPORT.md
             echo "---" >> reports/FINAL_REPORT.md
-            
           done < config/targets.txt
-          
-          echo "✅ Scan completed for all targets."
 
-      - name: 📤 Upload All Reports (Artifacts)
+      - name: 📤 Upload All Reports
         uses: actions/upload-artifact@v4
         with:
           name: Full-Bug-Reports
