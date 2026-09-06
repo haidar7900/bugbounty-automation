@@ -1,8 +1,8 @@
-name: 🤖 AI-Powered Auto Bug Hunt
+name: 🤖 Full Auto Hunt (Fire & Forget)
 on:
   schedule:
-    - cron: '0 */6 * * *'
-  workflow_dispatch:
+    - cron: '0 */6 * * *'   # يشتغل كل 6 ساعات
+  workflow_dispatch:        # تشغيل يدوي بالضغطة
 
 jobs:
   hunt:
@@ -10,47 +10,56 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Install Tools
+      - name: Install Tools (Subfinder, Httpx, Nuclei)
         run: |
           sudo apt update
-          sudo apt install -y git golang-go python3-pip jq nmap
-          pip install aiptx riftor
-          cd tools/BugTraceAI-CLI && pip install -r requirements.txt || true
-          cd tools/wp-hunter-mcp && pip install -r requirements.txt || true
-      
-      - name: Run BugTraceAI with DeepSeek
-        env:
-          LLM_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-        run: |
-          cd tools/BugTraceAI-CLI
-          python main.py --target example.com --output ../../reports/bugtrace.json || echo "BugTraceAI skipped"
-      
-      - name: Run AIPTX Scan
-        run: |
-          aiptx scan example.com --format json --output reports/aiptx.json || echo "AIPTX skipped"
-      
-      - name: Generate Final Report
+          sudo apt install -y git golang-go python3-pip jq
+          go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+          go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+          go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+          echo "export PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
+
+      - name: 🔥 Run Auto Scan on ALL targets in config/targets.txt
         run: |
           mkdir -p reports
-          echo "# 🛡️ AI Bug Bounty Report (Draft)" > reports/final_report.md
-          echo "" >> reports/final_report.md
-          echo "**Target:** example.com" >> reports/final_report.md
-          echo "**Date:** $(date)" >> reports/final_report.md
-          echo "**AI Model:** DeepSeek" >> reports/final_report.md
-          echo "" >> reports/final_report.md
-          echo "## Findings" >> reports/final_report.md
-          echo "" >> reports/final_report.md
-          echo "### BugTraceAI Results" >> reports/final_report.md
-          cat reports/bugtrace.json >> reports/final_report.md 2>/dev/null || echo "No data" >> reports/final_report.md
-          echo "" >> reports/final_report.md
-          echo "### AIPTX Results" >> reports/final_report.md
-          cat reports/aiptx.json >> reports/final_report.md 2>/dev/null || echo "No data" >> reports/final_report.md
-          echo "" >> reports/final_report.md
-          echo "---" >> reports/final_report.md
-          echo "*⚠️ Draft report. Verify all findings manually before submitting to HackerOne.*" >> reports/final_report.md
-      
-      - name: Upload Reports
+          echo "# 🛡️ Auto Bug Bounty Report" > reports/FINAL_REPORT.md
+          echo "**Date:** $(date)" >> reports/FINAL_REPORT.md
+          echo "" >> reports/FINAL_REPORT.md
+          
+          # حلقة تمر على كل هدف في ملف targets.txt
+          while read target; do
+            echo "========================================" >> reports/FINAL_REPORT.md
+            echo "🎯 Scanning Target: $target" | tee -a reports/FINAL_REPORT.md
+            echo "========================================" >> reports/FINAL_REPORT.md
+            
+            echo "[1/3] Finding subdomains for $target..."
+            subfinder -d $target -silent -o reports/sub_$target.txt
+            
+            echo "[2/3] Filtering alive hosts..."
+            httpx -l reports/sub_$target.txt -silent -o reports/alive_$target.txt
+            
+            echo "[3/3] Scanning with Nuclei..."
+            nuclei -l reports/alive_$target.txt -severity low,medium,high,critical -o reports/nuclei_$target.txt
+            
+            # نلصق نتائج هذا الهدف في التقرير النهائي
+            echo "### 🔍 Subdomains Found:" >> reports/FINAL_REPORT.md
+            cat reports/sub_$target.txt >> reports/FINAL_REPORT.md 2>/dev/null || echo "None" >> reports/FINAL_REPORT.md
+            
+            echo "### 🟢 Alive Hosts:" >> reports/FINAL_REPORT.md
+            cat reports/alive_$target.txt >> reports/FINAL_REPORT.md 2>/dev/null || echo "None" >> reports/FINAL_REPORT.md
+            
+            echo "### 🚨 Nuclei Vulnerabilities:" >> reports/FINAL_REPORT.md
+            cat reports/nuclei_$target.txt >> reports/FINAL_REPORT.md 2>/dev/null || echo "No vulnerabilities found" >> reports/FINAL_REPORT.md
+            
+            echo "" >> reports/FINAL_REPORT.md
+            echo "---" >> reports/FINAL_REPORT.md
+            
+          done < config/targets.txt
+          
+          echo "✅ Scan completed for all targets."
+
+      - name: 📤 Upload All Reports (Artifacts)
         uses: actions/upload-artifact@v4
         with:
-          name: ai-bug-reports
+          name: Full-Bug-Reports
           path: reports/
