@@ -1,4 +1,4 @@
-name: 🤖 Ultimate Auto Bug Hunt (DeepSeek Only)
+name: 🤖 Full Auto Hunt (Fire & Forget)
 on:
   schedule:
     - cron: '0 */6 * * *'
@@ -10,47 +10,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # تخزين مؤقت للأدوات لتسريع التشغيل
-      - name: Cache Tools
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/bin
-            ~/.cache/go-build
-            ~/.cache/pip
-          key: ${{ runner.os }}-ultimate-${{ hashFiles('setup.sh') }}
-
-      - name: Install Tools (Subfinder, Httpx, Nuclei)
+      # خطوة التثبيت (بدون Cache لتجنب الأخطاء)
+      - name: Install Tools
         run: |
           sudo apt update
           sudo apt install -y git golang-go python3-pip jq
+          # تثبيت الأدوات
           go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
           go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
           go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+          # إضافة مسار Go binaries إلى PATH
           echo "export PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
 
-      - name: 🔥 Full Auto Scan on ALL targets (DeepSeek AI)
-        env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      - name: 🔥 Run Auto Scan on ALL targets
         run: |
           mkdir -p reports
-          echo "# 🛡️ Bug Bounty Report (DeepSeek AI)" > reports/FINAL_REPORT.md
+          echo "# 🛡️ Auto Bug Bounty Report" > reports/FINAL_REPORT.md
           echo "**Date:** $(date)" >> reports/FINAL_REPORT.md
           echo "" >> reports/FINAL_REPORT.md
 
           while read target; do
-            echo "========================================" | tee -a reports/FINAL_REPORT.md
+            echo "========================================" >> reports/FINAL_REPORT.md
             echo "🎯 Scanning Target: $target" | tee -a reports/FINAL_REPORT.md
-            echo "========================================" | tee -a reports/FINAL_REPORT.md
+            echo "========================================" >> reports/FINAL_REPORT.md
 
             echo "[1/3] Subfinder - discovering subdomains..."
-            subfinder -d $target -silent -o reports/sub_$target.txt
+            subfinder -d $target -silent -o reports/sub_$target.txt || echo "Subfinder failed" 
 
             echo "[2/3] Httpx - filtering alive hosts..."
-            httpx -l reports/sub_$target.txt -silent -o reports/alive_$target.txt
+            httpx -l reports/sub_$target.txt -silent -o reports/alive_$target.txt || echo "Httpx failed"
 
             echo "[3/3] Nuclei - scanning for vulnerabilities..."
-            nuclei -l reports/alive_$target.txt -severity low,medium,high,critical -o reports/nuclei_$target.txt
+            nuclei -l reports/alive_$target.txt -severity low,medium,high,critical -o reports/nuclei_$target.txt || echo "Nuclei failed"
 
             echo "### 🔍 Subdomains Found:" >> reports/FINAL_REPORT.md
             cat reports/sub_$target.txt >> reports/FINAL_REPORT.md 2>/dev/null || echo "None" >> reports/FINAL_REPORT.md
@@ -66,9 +57,6 @@ jobs:
             echo "---" >> reports/FINAL_REPORT.md
 
           done < config/targets.txt
-
-          # ملاحظة: راح نضيف تحليل الذكاء الاصطناعي على النتائج لاحقاً إذا كانت الأدوات متوفرة.
-          echo "✅ Scan completed for all targets."
 
       - name: 📤 Upload All Reports
         uses: actions/upload-artifact@v4
