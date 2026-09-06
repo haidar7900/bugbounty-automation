@@ -1,24 +1,34 @@
 #!/bin/bash
-echo "🔧 Installing All Tools..."
+echo "🧠 Installing ULTIMATE Bug Bounty System (All Tools)..."
 
 # تحديث الحزم
 sudo apt update -y
-sudo apt install -y git golang-go python3-pip jq nmap
+sudo apt install -y git golang-go python3-pip jq nmap redis
 
-# أدوات الاستطلاع
+# أدوات الاستطلاع الأساسية (Go)
 go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
 go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
 go install -v github.com/projectdiscovery/katana/cmd/katana@latest
 go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+go install -v github.com/ffuf/ffuf/v2@latest
 
-# الأدوات الأساسية (تنصب وقت التشغيل)
-git clone https://github.com/Awarexone/Agentic-Bug-Hunter.git tools/Agentic-Bug-Hunter
-git clone https://github.com/Btr4k/bugbounty-agent.git tools/hawkeye
-git clone https://github.com/BugTraceAI/BugTraceAI-CLI.git tools/BugTraceAI-CLI
-git clone https://github.com/RaheesAhmed/wp-hunter-mcp.git tools/wp-hunter-mcp
-git clone https://github.com/usestrix/strix.git tools/strix
+# أدوات Python (BBOT, SpiderFoot, n8n)
+pip install bbot spiderfoot n8n
 
-# أدوات إضافية
-pip install aiptx riftor
+# تثبيت كل أداة من مجلد tools/
+for tool in tools/*; do
+    if [ -f "$tool/requirements.txt" ]; then
+        echo "📦 Installing $tool dependencies..."
+        pip install -r "$tool/requirements.txt" || true
+    fi
+    if [ -f "$tool/setup.py" ]; then
+        echo "📦 Installing $tool via setup.py..."
+        python "$tool/setup.py" install || true
+    fi
+    if [ -f "$tool/install.sh" ]; then
+        echo "📦 Running $tool/install.sh..."
+        chmod +x "$tool/install.sh" && "$tool/install.sh" || true
+    fi
+done
 
 echo "✅ All tools installed successfully!"
