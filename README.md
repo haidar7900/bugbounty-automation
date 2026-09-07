@@ -4,9 +4,6 @@ System integrates AI Agents (Agentic-Bug-Hunter, HawkEye) with recon tools.
 - **Recon**: Subfinder, Httpx, Katana
 - **Scan**: Nuclei, Hawkeye
 - **Report**: Manual review before submitting to HackerOne.
-cd ~/bugbounty-automation
-
-cat > README.md << 'EOF'
 <p align="center">
   <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=28&pause=1000&color=00FF00&center=true&vCenter=true&random=false&width=600&lines=🤖+ULTIMATE+Bug+Bounty+System;⚡+24%2F7+Auto-Hunt+with+AI;🛡️+50%2B+Powerful+Tools+Integrated" alt="Typing SVG" />
 </p>
@@ -39,12 +36,12 @@ It continuously:
 
 | Category | Tools | Count |
 | :--- | :--- | :--- |
-| **🌐 Reconnaissance** | `Amass`, `Subfinder`, `Assetfinder`, `httpx`, `Katana`, `Gau`, `Waybackurls`, `theHarvester`, `ott3rrhunt`, `Recon-ng` | 10+ |
-| **🤖 AI Agents** | `Strix` (PoC), `Dark Wxlf`, `BugTraceAI`, `Pinakastra` (Payloads), `METATRON` (Local AI) | 5+ |
-| **🔎 Scanning** | `Nuclei`, `ONUS`, `Nosey Parker`, `TruffleHog` (Secrets), `GF`, `Httprobe` | 6+ |
-| **⚡ Exploitation** | `Strix` (Exploitation), `Reaper`, `Metasploit` (Optional), `SQLmap` (Optional) | 4+ |
-| **🛡️ WAF Bypass** | `XSSHunt` (Cloudflare/Akamai bypass), `Dalfox`, `KXSS`, `Chypass` (AI) | 4+ |
-| **📋 Reporting** | `Agentic-Bug-Hunter`, `h1mcp` (Draft reports), `bbscope` (Scope fetching) | 3+ |
+| **🌐 Reconnaissance** | Amass, Subfinder, Assetfinder, httpx, Katana, Gau, Waybackurls, theHarvester, ott3rrhunt, Recon-ng | 10+ |
+| **🤖 AI Agents** | Strix (PoC), Dark Wxlf, BugTraceAI, Pinakastra (Payloads), METATRON (Local AI) | 5+ |
+| **🔎 Scanning** | Nuclei, ONUS, Nosey Parker, TruffleHog (Secrets), GF, Httprobe | 6+ |
+| **⚡ Exploitation** | Strix (Exploitation), Reaper, Metasploit (Optional), SQLmap (Optional) | 4+ |
+| **🛡️ WAF Bypass** | XSSHunt (Cloudflare/Akamai bypass), Dalfox, KXSS, Chypass (AI) | 4+ |
+| **📋 Reporting** | Agentic-Bug-Hunter, h1mcp (Draft reports), bbscope (Scope fetching) | 3+ |
 
 ---
 
@@ -52,17 +49,16 @@ It continuously:
 
 ```mermaid
 graph TD
-    A[⏰ Schedule / Manual Trigger] --> B[📡 Fetch H1 Scopes / Public Targets];
-    B --> C[🔍 Advanced Recon (Amass, Subfinder, etc.)];
-    C --> D[🟢 Filter Alive Hosts (httpx)];
-    D --> E[🤖 AI-Powered Hunting (Strix, Dark Wxlf)];
-    E --> F[⚡ Exploitation & PoC Generation];
-    F --> G[🛡️ WAF Bypass & XSS Testing];
-    G --> H[📊 Generate Unified Report];
-    H --> I[📤 Upload to Artifacts];
-    I --> J[🔄 Repeat Every 4 Hours];
+    A[Schedule or Manual Trigger] --> B[Fetch H1 Scopes or Public Targets]
+    B --> C[Advanced Recon Amass Subfinder etc]
+    C --> D[Filter Alive Hosts with httpx]
+    D --> E[AI Powered Hunting Strix Dark Wxlf]
+    E --> F[Exploitation and PoC Generation]
+    F --> G[WAF Bypass and XSS Testing]
+    G --> H[Generate Unified Report]
+    H --> I[Upload to Artifacts]
+    I --> J[Repeat Every 4 Hours]
 <p align="center">
   <b>Made with ❤️ by haidar7900</b><br>
   <sub>⚡ Keep hunting, stay ethical!</sub>
 </p>
-EOF
