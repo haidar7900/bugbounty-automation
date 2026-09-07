@@ -5,17 +5,13 @@ on:
   workflow_dispatch:
 
 jobs:
-  hunt:
+  # ============ Job 1: تجهيز الأهداف وتوزيعها ============
+  prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    outputs:
+      matrix: ${{ steps.split.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install All Tools
-        run: |
-          chmod +x setup.sh
-          ./setup.sh
-          echo "export PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
 
       - name: 🔍 Auto-Fetch HackerOne Scopes
         env:
@@ -31,12 +27,54 @@ jobs:
           fi
           echo "✅ Found $(wc -l < config/h1_scopes.txt) targets"
 
-      - name: 🚀 ULTIMATE Scan (All Targets)
+      # تقسيم القائمة الكبيرة إلى مجموعات (chunks) بدل معالجتها تسلسلياً
+      - name: 📦 Split targets into chunks
+        id: split
+        run: |
+          split -l 20 config/h1_scopes.txt config/chunk_
+          MATRIX=$(ls config/chunk_* | jq -R -s -c 'split("\n")[:-1]')
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: target-chunks
+          path: config/chunk_*
+
+  # ============ Job 2: الفحص المتوازي (Matrix) ============
+  hunt:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 5          # 5 مجموعات تشتغل بنفس الوقت
+      matrix:
+        chunk: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: target-chunks
+          path: config/
+
+      - name: Install All Tools
+        run: |
+          chmod +x setup.sh
+          ./setup.sh
+          echo "export PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
+
+      - name: 🔄 Update Nuclei Templates
+        run: nuclei -update-templates -silent || true
+
+      - name: 🚀 Scan Chunk
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
           mkdir -p reports logs
-          
+          CHUNK_FILE="${{ matrix.chunk }}"
+          CHUNK_NAME=$(basename "$CHUNK_FILE")
+
           run_safe() {
             echo "[*] Running: $1"
             timeout 300 bash -c "$1" 2>&1 | tee -a logs/errors.log || {
@@ -44,106 +82,109 @@ jobs:
               echo "ERROR: $1" >> logs/failed_commands.txt
             }
           }
-          
-          echo "# 🛡️ ULTIMATE BUG BOUNTY REPORT" > reports/FINAL.md
-          echo "**Date:** $(date)" >> reports/FINAL.md
-          echo "**Targets:** $(wc -l < config/h1_scopes.txt)" >> reports/FINAL.md
-          echo "" >> reports/FINAL.md
-          
+
+          SUMMARY="reports/summary_${CHUNK_NAME}.md"
+          echo "# 🛡️ Chunk Report: $CHUNK_NAME" > "$SUMMARY"
+          echo "**Date:** $(date)" >> "$SUMMARY"
+          echo "" >> "$SUMMARY"
+
           while read target; do
             [ -z "$target" ] && continue
-            echo "========================================" | tee -a reports/FINAL.md
-            echo "🎯 TARGET: $target" | tee -a reports/FINAL.md
-            echo "========================================" | tee -a reports/FINAL.md
-            
-            # ===== 1. RECON (7 أدوات) =====
-            echo "[1/7] RECON (Amass, Subfinder, Assetfinder, ott3rrhunt, theHarvester)..." >> reports/FINAL.md
-            run_safe "amass enum -d $target -o reports/amass_${target}.txt"
+            echo "========================================"
+            echo "🎯 TARGET: $target"
+            echo "========================================"
+
+            DETAIL="reports/detail_${target}.md"
+            echo "# Target: $target" > "$DETAIL"
+
+            # ===== 1. RECON =====
+            run_safe "amass enum -d $target -timeout 5 -o reports/amass_${target}.txt"
             run_safe "subfinder -d $target -silent -o reports/sub_${target}.txt"
             run_safe "assetfinder -subs-only $target > reports/asset_${target}.txt"
             run_safe "python tools/ott3rrhunt/ott3rrhunt.py -d $target -o reports/ott3rr_${target}.txt"
             run_safe "python tools/theharvester/theHarvester.py -d $target -b all -f reports/harvester_${target}.html"
-            
-            # دمج النطاقات
-            cat reports/amass_${target}.txt reports/sub_${target}.txt reports/asset_${target}.txt > reports/all_${target}.txt
-            sort -u reports/all_${target}.txt -o reports/all_${target}.txt
-            echo "Subdomains: $(wc -l < reports/all_${target}.txt)" >> reports/FINAL.md
-            
-            # ===== 2. ALIVE HOSTS (httpx) =====
-            echo "[2/7] ALIVE HOSTS (httpx)..." >> reports/FINAL.md
+
+            cat reports/amass_${target}.txt reports/sub_${target}.txt reports/asset_${target}.txt 2>/dev/null \
+              | sort -u > reports/all_${target}.txt
+            SUB_COUNT=$(wc -l < reports/all_${target}.txt)
+
+            # ===== 2. ALIVE HOSTS =====
             run_safe "httpx -l reports/all_${target}.txt -silent -o reports/alive_${target}.txt"
-            echo "Alive hosts: $(wc -l < reports/alive_${target}.txt)" >> reports/FINAL.md
-            
-            # ===== 3. SCANNING (ONUS + NoseyParker + BugTraceAI) =====
-            echo "[3/7] SCANNING (ONUS + NoseyParker + BugTraceAI)..." >> reports/FINAL.md
+            ALIVE_COUNT=$(wc -l < reports/alive_${target}.txt 2>/dev/null || echo 0)
+
+            # ===== جمع URLs (مطلوب لـ kxss و dalfox) =====
+            run_safe "cat reports/alive_${target}.txt | gau --subs > reports/urls_${target}.txt"
+            run_safe "cat reports/alive_${target}.txt | waybackurls >> reports/urls_${target}.txt"
+            sort -u reports/urls_${target}.txt -o reports/urls_${target}.txt 2>/dev/null
+
+            # ===== 3. SCANNING =====
             run_safe "onus scan $target --output reports/onus_${target}.json"
             run_safe "noseyparker scan $target --output reports/noseyparker_${target}.json"
             run_safe "python tools/bugtrace/main.py --target $target --output reports/bugtrace_${target}.json"
-            
-            # ===== 4. AI HUNT (Dark Wxlf + Pinakastra + METATRON) =====
-            echo "[4/7] AI HUNT (Dark Wxlf + Pinakastra + METATRON)..." >> reports/FINAL.md
+
+            # ===== 4. AI HUNT =====
             run_safe "python tools/dark_wxlf/main.py -d $target -o reports/darkwxlf_${target}.json"
             run_safe "python tools/pinakastra/pinakastra.py -d $target -o reports/pinakastra_${target}.json"
             run_safe "python tools/metatron/metatron.py -d $target -o reports/metatron_${target}.json"
-            
-            # ===== 5. EXPLOITATION (Strix + Reaper) =====
-            echo "[5/7] EXPLOITATION (Strix + Reaper - PoC)..." >> reports/FINAL.md
+
+            # ===== 5. EXPLOITATION =====
             run_safe "strix --target $target --output reports/strix_${target}.json"
             run_safe "python tools/reaper/reaper.py -d $target -o reports/reaper_${target}.json"
-            
-            # ===== 6. WAF BYPASS & XSS (XSSHunt + Dalfox + KXSS) =====
-            echo "[6/7] WAF BYPASS (XSSHunt + Dalfox + KXSS)..." >> reports/FINAL.md
-            run_safe "xsshunt -u https://$target -o reports/xsshunt_${target}.txt"
-            run_safe "dalfox url https://$target -o reports/dalfox_${target}.txt"
-            run_safe "kxss -i reports/urls_${target}.txt > reports/kxss_${target}.txt"
-            
-            # ===== 7. NUCLEI (Final Scan) =====
-            echo "[7/7] NUCLEI (Final Scan)..." >> reports/FINAL.md
-            run_safe "nuclei -l reports/alive_${target}.txt -severity low,medium,high,critical -o reports/nuclei_${target}.txt"
-            
-            # ===== FINAL REPORT =====
-            echo "## 🔍 RECON (Subdomains)" >> reports/FINAL.md
-            cat reports/all_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
-            echo "" >> reports/FINAL.md
-            
-            echo "## 🟢 ALIVE HOSTS" >> reports/FINAL.md
-            cat reports/alive_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
-            echo "" >> reports/FINAL.md
-            
-            echo "## 🛡️ SCAN RESULTS (ONUS + BugTraceAI)" >> reports/FINAL.md
-            cat reports/onus_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
-            cat reports/bugtrace_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
-            echo "" >> reports/FINAL.md
-            
-            echo "## 🤖 AI FINDINGS (Dark Wxlf + Pinakastra)" >> reports/FINAL.md
-            cat reports/darkwxlf_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
-            cat reports/pinakastra_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
-            echo "" >> reports/FINAL.md
-            
-            echo "## ⚡ EXPLOITATION (Strix + Reaper - PoC)" >> reports/FINAL.md
-            cat reports/strix_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
-            cat reports/reaper_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
-            echo "" >> reports/FINAL.md
-            
-            echo "## 🚧 WAF BYPASS & XSS" >> reports/FINAL.md
-            cat reports/xsshunt_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
-            cat reports/dalfox_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
-            echo "" >> reports/FINAL.md
-            
-            echo "## 🚨 NUCLEI VULNERABILITIES" >> reports/FINAL.md
-            cat reports/nuclei_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "No vulnerabilities found" >> reports/FINAL.md
-            echo "" >> reports/FINAL.md
-            
-            echo "---" >> reports/FINAL.md
-            
-          done < config/h1_scopes.txt
-          
-          echo "✅ Scan completed." >> reports/FINAL.md
 
-      - name: 📤 Upload Reports
+            # ===== 6. WAF BYPASS & XSS =====
+            run_safe "xsshunt -u https://$target -o reports/xsshunt_${target}.txt"
+            run_safe "dalfox file reports/urls_${target}.txt -o reports/dalfox_${target}.txt"
+            run_safe "kxss < reports/urls_${target}.txt > reports/kxss_${target}.txt"
+
+            # ===== 7. NUCLEI =====
+            run_safe "nuclei -l reports/alive_${target}.txt -severity low,medium,high,critical -o reports/nuclei_${target}.txt"
+            NUCLEI_COUNT=$(wc -l < reports/nuclei_${target}.txt 2>/dev/null || echo 0)
+
+            # ===== دمج النتائج الخام بتقرير التفاصيل (منفصل عن الملخص) =====
+            for f in all alive nuclei xsshunt dalfox kxss; do
+              echo "## $f" >> "$DETAIL"
+              cat "reports/${f}_${target}.txt" >> "$DETAIL" 2>/dev/null || echo "None" >> "$DETAIL"
+            done
+            for f in onus noseyparker bugtrace darkwxlf pinakastra metatron strix reaper; do
+              echo "## $f" >> "$DETAIL"
+              cat "reports/${f}_${target}.json" >> "$DETAIL" 2>/dev/null || echo "None" >> "$DETAIL"
+            done
+
+            # ===== سطر ملخص واحد بس بملف الـ SUMMARY (يمنع انفجار الحجم) =====
+            echo "- **$target** → Subdomains: $SUB_COUNT | Alive: $ALIVE_COUNT | Nuclei findings: $NUCLEI_COUNT" >> "$SUMMARY"
+
+          done < "$CHUNK_FILE"
+
+      - name: 📤 Upload Chunk Reports
         uses: actions/upload-artifact@v4
         with:
-          name: Ultimate-Reports
+          name: reports-${{ strategy.job-index }}
           path: |
             reports/
             logs/
+
+  # ============ Job 3: دمج كل التقارير بنهاية التشغيل ============
+  merge:
+    needs: hunt
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: reports-*
+          path: all-reports
+          merge-multiple: true
+
+      - name: 🧩 Build Final Summary
+        run: |
+          echo "# 🛡️ ULTIMATE BUG BOUNTY — FINAL SUMMARY" > FINAL.md
+          echo "**Date:** $(date)" >> FINAL.md
+          echo "" >> FINAL.md
+          cat all-reports/summary_*.md >> FINAL.md 2>/dev/null || echo "No summaries found" >> FINAL.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ultimate-Final-Report
+          path: |
+            FINAL.md
+            all-reports/
