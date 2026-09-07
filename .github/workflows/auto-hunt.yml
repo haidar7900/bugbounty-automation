@@ -1,7 +1,7 @@
-name: 🤖 ULTIMATE Pentesting (All Tools)
+name: 🤖 ULTIMATE Bug Bounty (24/7 Auto-Hunt)
 on:
   schedule:
-    - cron: '0 */4 * * *'
+    - cron: '0 */4 * * *'   # كل 4 ساعات
   workflow_dispatch:
 
 jobs:
@@ -13,39 +13,25 @@ jobs:
 
       - name: Install All Tools
         run: |
-          sudo apt update
-          sudo apt install -y git golang-go python3-pip jq nmap masscan
-
-          # أدوات Go الأساسية
-          go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-          go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
-          go install -v github.com/projectdiscovery/katana/cmd/katana@latest
-          go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-          go install -v github.com/ffuf/ffuf/v2@latest
-          go install -v github.com/tomnomnom/waybackurls@latest
-          go install -v github.com/tomnomnom/assetfinder@latest
-          go install -v github.com/OWASP/Amass/v3/...@master
-
-          # أدوات الاستغلال (Strix)
-          git clone https://github.com/usestrix/strix.git /tmp/strix
-          cd /tmp/strix && pip install -r requirements.txt
-          sudo cp /tmp/strix/strix /usr/local/bin/
-
-          # أدوات مسح الثغرات (ONUS)
-          pip install git+https://github.com/maverickaayush/ONUS.git
-
-          # أدوات تجاوز الجدران النارية (XSSHunt)
-          go install -v github.com/Serdar715/xsshunt@latest
-
-          # أدوات اكتشاف المعلومات الحساسة (Nosey Parker)
-          go install -v github.com/praetorian-inc/noseyparker@latest
-
-          # تحديث قوالب Nuclei
-          nuclei -update-templates
-
+          chmod +x setup.sh
+          ./setup.sh
           echo "export PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
 
-      - name: 🔥 Ultimate Scan (All Tools)
+      - name: 🔍 Auto-Fetch HackerOne Scopes
+        env:
+          H1_TOKEN: ${{ secrets.H1_TOKEN }}
+          H1_USERNAME: ${{ secrets.H1_USERNAME }}
+        run: |
+          if [ -n "$H1_TOKEN" ] && [ -n "$H1_USERNAME" ]; then
+            echo "📡 Fetching H1 scopes with bbscope..."
+            bbscope h1 -t "$H1_TOKEN" -u "$H1_USERNAME" -b -o t > config/h1_scopes.txt
+          else
+            echo "📡 Fetching public scopes..."
+            curl -s https://raw.githubusercontent.com/arkadiyt/bounty-targets-data/main/data/domains.txt > config/h1_scopes.txt
+          fi
+          echo "✅ Found $(wc -l < config/h1_scopes.txt) targets"
+
+      - name: 🚀 ULTIMATE Scan (All Targets)
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
@@ -59,8 +45,9 @@ jobs:
             }
           }
           
-          echo "# 🛡️ ULTIMATE PENTESTING REPORT" > reports/FINAL.md
+          echo "# 🛡️ ULTIMATE BUG BOUNTY REPORT" > reports/FINAL.md
           echo "**Date:** $(date)" >> reports/FINAL.md
+          echo "**Targets:** $(wc -l < config/h1_scopes.txt)" >> reports/FINAL.md
           echo "" >> reports/FINAL.md
           
           while read target; do
@@ -69,61 +56,87 @@ jobs:
             echo "🎯 TARGET: $target" | tee -a reports/FINAL.md
             echo "========================================" | tee -a reports/FINAL.md
             
-            # ----- 1. RECON (Amass + Subfinder + Assetfinder) -----
-            echo "[1/6] RECON (Amass + Subfinder)..." >> reports/FINAL.md
+            # ===== 1. RECON (7 أدوات) =====
+            echo "[1/7] RECON (Amass, Subfinder, Assetfinder, ott3rrhunt, theHarvester)..." >> reports/FINAL.md
             run_safe "amass enum -d $target -o reports/amass_${target}.txt"
             run_safe "subfinder -d $target -silent -o reports/sub_${target}.txt"
             run_safe "assetfinder -subs-only $target > reports/asset_${target}.txt"
+            run_safe "python tools/ott3rrhunt/ott3rrhunt.py -d $target -o reports/ott3rr_${target}.txt"
+            run_safe "python tools/theharvester/theHarvester.py -d $target -b all -f reports/harvester_${target}.html"
             
             # دمج النطاقات
             cat reports/amass_${target}.txt reports/sub_${target}.txt reports/asset_${target}.txt > reports/all_${target}.txt
             sort -u reports/all_${target}.txt -o reports/all_${target}.txt
+            echo "Subdomains: $(wc -l < reports/all_${target}.txt)" >> reports/FINAL.md
             
-            # ----- 2. ALIVE HOSTS (httpx) -----
-            echo "[2/6] ALIVE HOSTS (httpx)..." >> reports/FINAL.md
+            # ===== 2. ALIVE HOSTS (httpx) =====
+            echo "[2/7] ALIVE HOSTS (httpx)..." >> reports/FINAL.md
             run_safe "httpx -l reports/all_${target}.txt -silent -o reports/alive_${target}.txt"
+            echo "Alive hosts: $(wc -l < reports/alive_${target}.txt)" >> reports/FINAL.md
             
-            # ----- 3. SCANNING (ONUS + Nosey Parker) -----
-            echo "[3/6] SCANNING (ONUS + Nosey Parker)..." >> reports/FINAL.md
+            # ===== 3. SCANNING (ONUS + NoseyParker + BugTraceAI) =====
+            echo "[3/7] SCANNING (ONUS + NoseyParker + BugTraceAI)..." >> reports/FINAL.md
             run_safe "onus scan $target --output reports/onus_${target}.json"
             run_safe "noseyparker scan $target --output reports/noseyparker_${target}.json"
+            run_safe "python tools/bugtrace/main.py --target $target --output reports/bugtrace_${target}.json"
             
-            # ----- 4. EXPLOITATION (Strix) -----
-            echo "[4/6] EXPLOITATION (Strix - PoC)..." >> reports/FINAL.md
+            # ===== 4. AI HUNT (Dark Wxlf + Pinakastra + METATRON) =====
+            echo "[4/7] AI HUNT (Dark Wxlf + Pinakastra + METATRON)..." >> reports/FINAL.md
+            run_safe "python tools/dark_wxlf/main.py -d $target -o reports/darkwxlf_${target}.json"
+            run_safe "python tools/pinakastra/pinakastra.py -d $target -o reports/pinakastra_${target}.json"
+            run_safe "python tools/metatron/metatron.py -d $target -o reports/metatron_${target}.json"
+            
+            # ===== 5. EXPLOITATION (Strix + Reaper) =====
+            echo "[5/7] EXPLOITATION (Strix + Reaper - PoC)..." >> reports/FINAL.md
             run_safe "strix --target $target --output reports/strix_${target}.json"
+            run_safe "python tools/reaper/reaper.py -d $target -o reports/reaper_${target}.json"
             
-            # ----- 5. WAF BYPASS (XSSHunt) -----
-            echo "[5/6] WAF BYPASS (XSSHunt)..." >> reports/FINAL.md
+            # ===== 6. WAF BYPASS & XSS (XSSHunt + Dalfox + KXSS) =====
+            echo "[6/7] WAF BYPASS (XSSHunt + Dalfox + KXSS)..." >> reports/FINAL.md
             run_safe "xsshunt -u https://$target -o reports/xsshunt_${target}.txt"
+            run_safe "dalfox url https://$target -o reports/dalfox_${target}.txt"
+            run_safe "kxss -i reports/urls_${target}.txt > reports/kxss_${target}.txt"
             
-            # ----- 6. NUCLEI (Final Scan) -----
-            echo "[6/6] NUCLEI (Vulnerabilities)..." >> reports/FINAL.md
+            # ===== 7. NUCLEI (Final Scan) =====
+            echo "[7/7] NUCLEI (Final Scan)..." >> reports/FINAL.md
             run_safe "nuclei -l reports/alive_${target}.txt -severity low,medium,high,critical -o reports/nuclei_${target}.txt"
             
-            # ----- FINAL REPORT -----
-            echo "## 🔍 RECON RESULTS" >> reports/FINAL.md
+            # ===== FINAL REPORT =====
+            echo "## 🔍 RECON (Subdomains)" >> reports/FINAL.md
             cat reports/all_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
             echo "" >> reports/FINAL.md
             
-            echo "## 🛡️ SCAN RESULTS" >> reports/FINAL.md
+            echo "## 🟢 ALIVE HOSTS" >> reports/FINAL.md
+            cat reports/alive_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
+            echo "" >> reports/FINAL.md
+            
+            echo "## 🛡️ SCAN RESULTS (ONUS + BugTraceAI)" >> reports/FINAL.md
             cat reports/onus_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
+            cat reports/bugtrace_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
             echo "" >> reports/FINAL.md
             
-            echo "## ⚡ EXPLOITATION RESULTS (Strix)" >> reports/FINAL.md
+            echo "## 🤖 AI FINDINGS (Dark Wxlf + Pinakastra)" >> reports/FINAL.md
+            cat reports/darkwxlf_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
+            cat reports/pinakastra_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
+            echo "" >> reports/FINAL.md
+            
+            echo "## ⚡ EXPLOITATION (Strix + Reaper - PoC)" >> reports/FINAL.md
             cat reports/strix_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
+            cat reports/reaper_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
             echo "" >> reports/FINAL.md
             
-            echo "## 🚧 WAF BYPASS RESULTS" >> reports/FINAL.md
+            echo "## 🚧 WAF BYPASS & XSS" >> reports/FINAL.md
             cat reports/xsshunt_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
+            cat reports/dalfox_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
             echo "" >> reports/FINAL.md
             
             echo "## 🚨 NUCLEI VULNERABILITIES" >> reports/FINAL.md
-            cat reports/nuclei_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
+            cat reports/nuclei_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "No vulnerabilities found" >> reports/FINAL.md
             echo "" >> reports/FINAL.md
             
             echo "---" >> reports/FINAL.md
             
-          done < config/targets.txt
+          done < config/h1_scopes.txt
           
           echo "✅ Scan completed." >> reports/FINAL.md
 
