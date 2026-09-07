@@ -1,73 +1,167 @@
-name: 🤖 Ultimate Bug Bounty (Stable Version)
+name: 🤖 Ultimate Bug Bounty (Power Tools + Error Handling)
 on:
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '0 */4 * * *'
   workflow_dispatch:
 
 jobs:
   hunt:
     runs-on: ubuntu-latest
+    timeout-minutes: 45  # حد أقصى 45 دقيقة عشان ما يعلق
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Core Tools
+      # ----- تثبيت الأساسيات + أدوات إضافية قوية -----
+      - name: Install All Tools (Fast & Stable)
         run: |
           sudo apt update
           sudo apt install -y git golang-go python3-pip jq nmap
           
-          # تثبيت الأدوات الأساسية
+          # أدوات Go الأساسية
           go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
           go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+          go install -v github.com/projectdiscovery/katana/cmd/katana@latest
           go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
           go install -v github.com/ffuf/ffuf/v2@latest
+          go install -v github.com/tomnomnom/waybackurls@latest
+          go install -v github.com/tomnomnom/gf@latest
+          go install -v github.com/tomnomnom/assetfinder@latest
+          go install -v github.com/tomnomnom/httprobe@latest
+          go install -v github.com/hakluke/hakrawler@latest
+          go install -v github.com/hakluke/hakrevdns@latest
           
           # تحديث قوالب Nuclei
           nuclei -update-templates
           
+          # أدوات Python (ذكاء اصطناعي)
+          pip install --upgrade pip
+          pip install bbot aiptx riftor \
+            strix-cli bugtrace-cli \
+            git+https://github.com/Awarexone/Agentic-Bug-Hunter.git
+          
+          # تثبيت Strix (PoC)
+          git clone https://github.com/usestrix/strix.git /tmp/strix
+          cd /tmp/strix && pip install -r requirements.txt
+          sudo cp /tmp/strix/strix /usr/local/bin/
+          
+          # إضافة PATH
           echo "export PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
+          echo "export PYTHONPATH=$PYTHONPATH:/tmp/agentic" >> $GITHUB_ENV
 
-      - name: 🔥 Run Scan (Stable)
+      # ----- التشغيل مع تجاوز الأخطاء -----
+      - name: 🚀 Ultimate Scan (All Tools + Error Resilience)
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
-          mkdir -p reports
-          echo "# 🛡️ Bug Bounty Report (Stable)" > reports/FINAL_REPORT.md
-          echo "**Date:** $(date)" >> reports/FINAL_REPORT.md
-          echo "" >> reports/FINAL_REPORT.md
+          set -e  # يوقف السكربت عند أي خطأ غير متوقع
+          mkdir -p reports logs
+          
+          # دالة لتسجيل الأخطاء ومواصلة التشغيل
+          run_safe() {
+            echo "[*] Running: $1"
+            timeout 300 bash -c "$1" 2>&1 | tee -a logs/errors.log || {
+              echo "[!] Command failed: $1 (continuing...)"
+              echo "ERROR: $1" >> logs/failed_commands.txt
+            }
+          }
+          
+          echo "# 🛡️ ULTIMATE BUG BOUNTY REPORT (All Power Tools)" > reports/FINAL.md
+          echo "**Date:** $(date)" >> reports/FINAL.md
+          echo "**Targets:** $(cat config/targets.txt | tr '\n' ' ')" >> reports/FINAL.md
+          echo "" >> reports/FINAL.md
 
           while read target; do
-            echo "========================================" | tee -a reports/FINAL_REPORT.md
-            echo "🎯 Target: $target" | tee -a reports/FINAL_REPORT.md
-            echo "========================================" | tee -a reports/FINAL_REPORT.md
+            echo "========================================" | tee -a reports/FINAL.md
+            echo "🎯 TARGET: $target" | tee -a reports/FINAL.md
+            echo "========================================" | tee -a reports/FINAL.md
 
-            # 1. جمع النطاقات الفرعية
-            echo "[1/3] Subfinder - discovering subdomains..."
-            subfinder -d $target -silent -o reports/sub_$target.txt || echo "Subfinder failed"
+            # ----- المرحلة 1: جمع المعلومات القوي -----
+            echo "[1/6] POWER RECON (BBOT + Subfinder + Assetfinder + Katana)..." >> reports/FINAL.md
             
-            # 2. فلترة النطاقات الحية
-            echo "[2/3] Httpx - filtering alive hosts..."
-            httpx -l reports/sub_$target.txt -silent -o reports/alive_$target.txt || echo "Httpx failed"
+            run_safe "bbot -t $target -f subdomain-enum -o reports/bbot_${target}.json"
+            run_safe "subfinder -d $target -silent -o reports/sub_${target}.txt"
+            run_safe "assetfinder -subs-only $target > reports/asset_${target}.txt"
+            run_safe "katana -u https://$target -d 3 -o reports/katana_${target}.txt"
             
-            # 3. مسح الثغرات
-            echo "[3/3] Nuclei - scanning vulnerabilities..."
-            nuclei -l reports/alive_$target.txt -severity low,medium,high,critical -o reports/nuclei_$target.txt || echo "Nuclei failed"
-            
-            # تجميع النتائج
-            echo "### 🔍 Subdomains:" >> reports/FINAL_REPORT.md
-            cat reports/sub_$target.txt >> reports/FINAL_REPORT.md 2>/dev/null || echo "None" >> reports/FINAL_REPORT.md
-            echo "" >> reports/FINAL_REPORT.md
-            
-            echo "### 🟢 Alive Hosts:" >> reports/FINAL_REPORT.md
-            cat reports/alive_$target.txt >> reports/FINAL_REPORT.md 2>/dev/null || echo "None" >> reports/FINAL_REPORT.md
-            echo "" >> reports/FINAL_REPORT.md
-            
-            echo "### 🚨 Vulnerabilities:" >> reports/FINAL_REPORT.md
-            cat reports/nuclei_$target.txt >> reports/FINAL_REPORT.md 2>/dev/null || echo "None" >> reports/FINAL_REPORT.md
-            echo "" >> reports/FINAL_REPORT.md
-            echo "---" >> reports/FINAL_REPORT.md
+            # دمج النطاقات
+            cat reports/bbot_${target}.json | jq -r '.hosts[]' 2>/dev/null > reports/all_${target}.txt || true
+            cat reports/sub_${target}.txt >> reports/all_${target}.txt 2>/dev/null || true
+            cat reports/asset_${target}.txt >> reports/all_${target}.txt 2>/dev/null || true
+            sort -u reports/all_${target}.txt -o reports/all_${target}.txt
+
+            # ----- المرحلة 2: فحص المنافذ والخدمات -----
+            echo "[2/6] PORT SCAN (Nmap + Httpx + Httprobe)..." >> reports/FINAL.md
+            run_safe "nmap -T4 -p 80,443,8080,8443 -iL reports/all_${target}.txt -oG reports/nmap_${target}.txt"
+            run_safe "httpx -l reports/all_${target}.txt -silent -o reports/alive_${target}.txt"
+            run_safe "httprobe -c 50 -t 3000 < reports/all_${target}.txt > reports/probe_${target}.txt"
+
+            # ----- المرحلة 3: Fuzzing (اكتشاف الملفات المخفية) -----
+            echo "[3/6] FUZZING (FFUF + WayBackURLs)..." >> reports/FINAL.md
+            run_safe "ffuf -u https://$target/FUZZ -w /usr/share/wordlists/dirb/common.txt -o reports/ffuf_${target}.json"
+            run_safe "waybackurls $target > reports/wayback_${target}.txt"
+            run_safe "hakrawler -url https://$target -depth 3 -plain > reports/hakrawler_${target}.txt"
+
+            # ----- المرحلة 4: الذكاء الاصطناعي (Agentic + AIPTX + Riftor) -----
+            echo "[4/6] AI-POWERED HUNT (Agentic + AIPTX + Riftor)..." >> reports/FINAL.md
+            if [ -n "$DEEPSEEK_API_KEY" ]; then
+              run_safe "bughunter recon $target --ai deepseek --output reports/agentic_recon_${target}.json"
+              run_safe "bughunter hunt $target --ai deepseek --output reports/agentic_hunt_${target}.json"
+              run_safe "aiptx scan $target --ai --format json --output reports/aiptx_${target}.json"
+              run_safe "riftor --model deepseek -p 'Scan $target for OWASP Top 10' --output reports/riftor_${target}.json"
+            else
+              echo "Skipped AI (no DEEPSEEK_API_KEY)" > reports/agentic_${target}.json
+            fi
+
+            # ----- المرحلة 5: Strix (PoC) -----
+            echo "[5/6] EXPLOITATION (Strix - PoC Generation)..." >> reports/FINAL.md
+            run_safe "strix --target $target --output reports/strix_${target}.json"
+
+            # ----- المرحلة 6: Nuclei (الثغرات المعروفة) -----
+            echo "[6/6] NUCLEI (CVE Scan)..." >> reports/FINAL.md
+            run_safe "nuclei -l reports/alive_${target}.txt -severity low,medium,high,critical -o reports/nuclei_${target}.txt"
+
+            # ----- تجميع التقرير النهائي -----
+            echo "## 🔍 SUBDOMAINS (All Sources)" >> reports/FINAL.md
+            cat reports/all_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
+            echo "" >> reports/FINAL.md
+
+            echo "## 🟢 ALIVE HOSTS" >> reports/FINAL.md
+            cat reports/alive_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
+            echo "" >> reports/FINAL.md
+
+            echo "## 🤖 AI FINDINGS" >> reports/FINAL.md
+            cat reports/agentic_hunt_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
+            echo "" >> reports/FINAL.md
+
+            echo "## ⚡ STRIX (PoC)" >> reports/FINAL.md
+            cat reports/strix_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
+            echo "" >> reports/FINAL.md
+
+            echo "## 🚨 NUCLEI VULNERABILITIES" >> reports/FINAL.md
+            cat reports/nuclei_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "No vulnerabilities found" >> reports/FINAL.md
+            echo "" >> reports/FINAL.md
+
+            echo "## 📂 FILES DISCOVERED (FFUF + Wayback)" >> reports/FINAL.md
+            cat reports/ffuf_${target}.json | jq -r '.results[].url' 2>/dev/null >> reports/FINAL.md || echo "None" >> reports/FINAL.md
+            cat reports/wayback_${target}.txt >> reports/FINAL.md 2>/dev/null || true
+            echo "" >> reports/FINAL.md
+            echo "---" >> reports/FINAL.md
 
           done < config/targets.txt
 
-      - name: 📤 Upload Reports
+          echo "✅ Scan completed." >> reports/FINAL.md
+          
+          # إحصائيات
+          echo "## 📊 STATISTICS" >> reports/FINAL.md
+          echo "- Total targets: $(cat config/targets.txt | wc -l)" >> reports/FINAL.md
+          echo "- Failed commands: $(cat logs/failed_commands.txt 2>/dev/null | wc -l)" >> reports/FINAL.md
+          echo "- Logs: See `logs/errors.log`" >> reports/FINAL.md
+
+      # ----- رفع التقارير -----
+      - name: 📤 Upload Reports & Logs
         uses: actions/upload-artifact@v4
         with:
-          name: Bug-Reports
-          path: reports/
+          name: Ultimate-Reports-With-Logs
+          path: |
+            reports/
+            logs/
