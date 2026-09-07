@@ -10,19 +10,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # خطوة التثبيت (بدون Cache لتجنب الأخطاء)
       - name: Install Tools
         run: |
           sudo apt update
           sudo apt install -y git golang-go python3-pip jq
-          # تثبيت الأدوات
           go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
           go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
           go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-          # إضافة مسار Go binaries إلى PATH
           echo "export PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
 
-      - name: 🔥 Run Auto Scan on ALL targets
+      - name: 🔥 Run Auto Scan (With Fallback)
         run: |
           mkdir -p reports
           echo "# 🛡️ Auto Bug Bounty Report" > reports/FINAL_REPORT.md
@@ -34,15 +31,29 @@ jobs:
             echo "🎯 Scanning Target: $target" | tee -a reports/FINAL_REPORT.md
             echo "========================================" >> reports/FINAL_REPORT.md
 
+            # 1. جمع النطاقات الفرعية (مع تصحيح الأخطاء)
             echo "[1/3] Subfinder - discovering subdomains..."
-            subfinder -d $target -silent -o reports/sub_$target.txt || echo "Subfinder failed" 
+            subfinder -d $target -silent -o reports/sub_$target.txt || echo "Subfinder failed"
+
+            # 2. إذا لم يجد subfinder نطاقات، نضيف الهدف نفسه كـ "host حي"
+            if [ ! -s reports/sub_$target.txt ]; then
+              echo "⚠️ No subdomains found. Adding the main domain as alive host."
+              echo "$target" > reports/sub_$target.txt
+            fi
 
             echo "[2/3] Httpx - filtering alive hosts..."
             httpx -l reports/sub_$target.txt -silent -o reports/alive_$target.txt || echo "Httpx failed"
 
+            # 3. إذا لم يجد httpx أي hosts حية، نجبره على فحص الهدف الرئيسي مباشرة
+            if [ ! -s reports/alive_$target.txt ]; then
+              echo "⚠️ No alive hosts found. Forcing scan on main domain: $target"
+              echo "$target" > reports/alive_$target.txt
+            fi
+
             echo "[3/3] Nuclei - scanning for vulnerabilities..."
             nuclei -l reports/alive_$target.txt -severity low,medium,high,critical -o reports/nuclei_$target.txt || echo "Nuclei failed"
 
+            # إضافة النتائج للتقرير
             echo "### 🔍 Subdomains Found:" >> reports/FINAL_REPORT.md
             cat reports/sub_$target.txt >> reports/FINAL_REPORT.md 2>/dev/null || echo "None" >> reports/FINAL_REPORT.md
             echo "" >> reports/FINAL_REPORT.md
