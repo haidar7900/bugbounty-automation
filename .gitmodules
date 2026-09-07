@@ -1,39 +1,24 @@
-[submodule "tools/BBOT"]
-	path = tools/BBOT
-	url = https://github.com/blacklanternsecurity/bbot.git
-[submodule "tools/ott3rrhunt"]
-	path = tools/ott3rrhunt
-	url = https://github.com/ott3rr-1/ott3rrhunt.git
-[submodule "tools/ReconFTW"]
-	path = tools/ReconFTW
-	url = https://github.com/six2dez/reconftw.git
-[submodule "tools/HawkEye"]
-	path = tools/HawkEye
-	url = https://github.com/Btr4k/bugbounty-agent.git
-[submodule "tools/BugTrace-AI"]
-	path = tools/BugTrace-AI
+[submodule "tools/Agentic-Bug-Hunter"]
+	path = tools/Agentic-Bug-Hunter
+	url = https://github.com/Awarexone/Agentic-Bug-Hunter.git
+[submodule "tools/Pentest-Agents"]
+	path = tools/Pentest-Agents
+	url = https://github.com/H-mmer/pentest-agents.git
+[submodule "tools/BugTraceAI-CLI"]
+	path = tools/BugTraceAI-CLI
 	url = https://github.com/BugTraceAI/BugTraceAI-CLI.git
 [submodule "tools/Strix"]
 	path = tools/Strix
 	url = https://github.com/usestrix/strix.git
-[submodule "tools/Gato-X"]
-	path = tools/Gato-X
-	url = https://github.com/0x48piraj/Gato-X.git
-[submodule "tools/Scope"]
-	path = tools/Scope
-	url = https://github.com/rix4uni/scope.git
-[submodule "tools/SpiderFoot"]
-	path = tools/SpiderFoot
-	url = https://github.com/smicallef/spiderfoot.git
-[submodule "tools/n8n-workflow"]
-	path = tools/n8n-workflow
-	url = https://github.com/Sheepwiz/bugbounty_n8n_workflow.git
-[submodule "tools/Security-Skills"]
-	path = tools/Security-Skills
-	url = https://github.com/0xN1x0/MCP-Security-Skills.git
-[submodule "tools/HexStrike"]
-	path = tools/HexStrike
+[submodule "tools/AIPTX"]
+	path = tools/AIPTX
+	url = https://github.com/0x0x0x0x0x0x0x/aiptx.git
+[submodule "tools/Riftor"]
+	path = tools/Riftor
+	url = https://github.com/revolt-rai/riftor.git
+[submodule "tools/HexStrike-AI"]
+	path = tools/HexStrike-AI
 	url = https://github.com/morpheusc/Hexstrike-AI.git
-[submodule "tools/RAI"]
-	path = tools/RAI
-	url = https://github.com/revolt-rai/rai.git
+[submodule "tools/BBOT"]
+	path = tools/BBOT
+	url = https://github.com/blacklanternsecurity/bbot.git

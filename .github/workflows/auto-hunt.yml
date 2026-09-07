@@ -1,7 +1,7 @@
-name: 🤖 Full Auto Hunt (Fire & Forget)
+name: 🤖 Ultimate Bug Bounty (All AI Tools)
 on:
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '0 */4 * * *'
   workflow_dispatch:
 
 jobs:
@@ -10,47 +10,92 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Tools
+      - name: Install All Tools
         run: |
-          sudo apt update
-          sudo apt install -y git golang-go python3-pip jq
-          go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
-          go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-          # تحديث قوالب Nuclei لأحدث إصدار (مهم جداً)
-          nuclei -update-templates
+          chmod +x setup.sh
+          ./setup.sh
           echo "export PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
+          echo "export PYTHONPATH=$PYTHONPATH:$(pwd)/tools" >> $GITHUB_ENV
 
-      - name: 🔥 Run Scan (Using Pre-defined Subdomains)
+      - name: 🔥 Ultimate Scan (All AI Agents)
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
           mkdir -p reports
-          echo "# 🛡️ Bug Bounty Report (Targeted Scan)" > reports/FINAL_REPORT.md
-          echo "**Date:** $(date)" >> reports/FINAL_REPORT.md
-          echo "" >> reports/FINAL_REPORT.md
-          echo "**Note:** Using predefined subdomain list (bypassed subfinder)." >> reports/FINAL_REPORT.md
-          echo "" >> reports/FINAL_REPORT.md
+          echo "# 🛡️ ULTIMATE BUG BOUNTY REPORT (All AI Tools)" > reports/ULTIMATE_REPORT.md
+          echo "**Date:** $(date)" >> reports/ULTIMATE_REPORT.md
+          echo "" >> reports/ULTIMATE_REPORT.md
 
-          # 1. فلترة النطاقات الحية من القائمة المعروفة
-          echo "[1/2] Httpx - filtering alive hosts from known list..."
-          httpx -l data/known_subdomains.txt -silent -o reports/alive_hosts.txt || echo "Httpx failed"
+          while read target; do
+            echo "========================================" | tee -a reports/ULTIMATE_REPORT.md
+            echo "🎯 TARGET: $target" | tee -a reports/ULTIMATE_REPORT.md
+            echo "========================================" | tee -a reports/ULTIMATE_REPORT.md
 
-          # 2. مسح الثغرات على النطاقات الحية فقط
-          echo "[2/2] Nuclei - scanning for vulnerabilities..."
-          nuclei -l reports/alive_hosts.txt -severity low,medium,high,critical -o reports/nuclei_results.txt || echo "Nuclei failed"
+            # --- المرحلة 1: الاستطلاع المتقدم (BBOT + Subfinder) ---
+            echo "[1/6] RECON (BBOT + Subfinder)..."
+            bbot -t $target -f subdomain-enum -o reports/bbot_$target.json || true
+            subfinder -d $target -silent -o reports/sub_$target.txt || true
+            cat reports/bbot_$target.json | jq -r '.hosts[]' > reports/all_subs_$target.txt 2>/dev/null || true
+            cat reports/sub_$target.txt >> reports/all_subs_$target.txt 2>/dev/null || true
+            sort -u reports/all_subs_$target.txt -o reports/all_subs_$target.txt
 
-          # كتابة التقرير
-          echo "### 🟢 Alive Hosts (Scanned):" >> reports/FINAL_REPORT.md
-          cat reports/alive_hosts.txt >> reports/FINAL_REPORT.md 2>/dev/null || echo "None" >> reports/FINAL_REPORT.md
-          echo "" >> reports/FINAL_REPORT.md
+            # --- المرحلة 2: الصيد بالذكاء الاصطناعي (Agentic-Bug-Hunter) ---
+            echo "[2/6] AI HUNT (Agentic-Bug-Hunter)..."
+            cd tools/Agentic-Bug-Hunter
+            python main.py --target $target --ai deepseek --output ../../reports/agentic_$target.json || true
+            cd ../..
 
-          echo "### 🚨 Nuclei Vulnerabilities Found:" >> reports/FINAL_REPORT.md
-          cat reports/nuclei_results.txt >> reports/FINAL_REPORT.md 2>/dev/null || echo "No vulnerabilities found" >> reports/FINAL_REPORT.md
-          echo "" >> reports/FINAL_REPORT.md
+            # --- المرحلة 3: وكلاء متخصصون (BugTraceAI-CLI) ---
+            echo "[3/6] SPECIALIZED AGENTS (BugTraceAI-CLI)..."
+            cd tools/BugTraceAI-CLI
+            python main.py --target $target --output ../../reports/bugtrace_$target.json || true
+            cd ../..
 
-          echo "---" >> reports/FINAL_REPORT.md
-          echo "✅ Scan completed."
+            # --- المرحلة 4: التحقق والاستغلال (Strix + Pentest Agents) ---
+            echo "[4/6] EXPLOITATION (Strix + Pentest Agents)..."
+            cd tools/Strix
+            python strix.py --target $target --output ../../reports/strix_$target.json || true
+            cd ../..
+            cd tools/Pentest-Agents
+            python agents.py --target $target --output ../../reports/pentest_$target.json || true
+            cd ../..
+
+            # --- المرحلة 5: المسح الشامل (AIPTX + Riftor + Nuclei) ---
+            echo "[5/6] COMPREHENSIVE SCAN (AIPTX + Riftor + Nuclei)..."
+            aiptx scan $target --ai --format json --output reports/aiptx_$target.json || true
+            riftor --model deepseek -p "Scan $target for all OWASP Top 10" --output reports/riftor_$target.json || true
+            nuclei -l reports/all_subs_$target.txt -severity low,medium,high,critical -o reports/nuclei_$target.txt || true
+
+            # --- المرحلة 6: التقرير النهائي (دمج كل النتائج) ---
+            echo "[6/6] FINAL REPORT..."
+            echo "## 🎯 Target: $target" >> reports/ULTIMATE_REPORT.md
+            echo "" >> reports/ULTIMATE_REPORT.md
+            
+            echo "### 📡 All Subdomains:" >> reports/ULTIMATE_REPORT.md
+            cat reports/all_subs_$target.txt >> reports/ULTIMATE_REPORT.md 2>/dev/null || echo "None" >> reports/ULTIMATE_REPORT.md
+            echo "" >> reports/ULTIMATE_REPORT.md
+
+            echo "### 🤖 Agentic-Bug-Hunter Findings:" >> reports/ULTIMATE_REPORT.md
+            cat reports/agentic_$target.json >> reports/ULTIMATE_REPORT.md 2>/dev/null || echo "None" >> reports/ULTIMATE_REPORT.md
+            echo "" >> reports/ULTIMATE_REPORT.md
+
+            echo "### 🚀 Strix PoC Findings:" >> reports/ULTIMATE_REPORT.md
+            cat reports/strix_$target.json >> reports/ULTIMATE_REPORT.md 2>/dev/null || echo "None" >> reports/ULTIMATE_REPORT.md
+            echo "" >> reports/ULTIMATE_REPORT.md
+
+            echo "### 🚨 Nuclei Vulnerabilities:" >> reports/ULTIMATE_REPORT.md
+            cat reports/nuclei_$target.txt >> reports/ULTIMATE_REPORT.md 2>/dev/null || echo "None" >> reports/ULTIMATE_REPORT.md
+            echo "" >> reports/ULTIMATE_REPORT.md
+
+            echo "---" >> reports/ULTIMATE_REPORT.md
+            echo "" >> reports/ULTIMATE_REPORT.md
+
+          done < config/targets.txt
+
+          echo "✅ ULTIMATE scan completed for all targets."
 
       - name: 📤 Upload All Reports
         uses: actions/upload-artifact@v4
         with:
-          name: Full-Bug-Reports
+          name: Ultimate-Reports
           path: reports/
