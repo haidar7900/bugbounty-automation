@@ -7,16 +7,16 @@ on:
 jobs:
   hunt:
     runs-on: ubuntu-latest
-    timeout-minutes: 45  # حد أقصى 45 دقيقة عشان ما يعلق
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
-      # ----- تثبيت الأساسيات + أدوات إضافية قوية -----
+      # ----- تثبيت جميع الأدوات (مع التركيز على hakrevdns) -----
       - name: Install All Tools (Fast & Stable)
         run: |
           sudo apt update
           sudo apt install -y git golang-go python3-pip jq nmap
-          
+
           # أدوات Go الأساسية
           go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
           go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
@@ -28,35 +28,44 @@ jobs:
           go install -v github.com/tomnomnom/assetfinder@latest
           go install -v github.com/tomnomnom/httprobe@latest
           go install -v github.com/hakluke/hakrawler@latest
-          go install -v github.com/hakluke/hakrevdns@latest
           
+          # ✅ تثبيت hakrevdns بشكل صحيح
+          go install -v github.com/hakluke/hakrevdns@latest
+
           # تحديث قوالب Nuclei
           nuclei -update-templates
-          
+
           # أدوات Python (ذكاء اصطناعي)
           pip install --upgrade pip
-          pip install bbot aiptx riftor \
-            strix-cli bugtrace-cli \
-            git+https://github.com/Awarexone/Agentic-Bug-Hunter.git
-          
-          # تثبيت Strix (PoC)
+          pip install bbot aiptx riftor strix-cli
+          pip install git+https://github.com/Awarexone/Agentic-Bug-Hunter.git
+
+          # تثبيت Strix يدوياً
           git clone https://github.com/usestrix/strix.git /tmp/strix
           cd /tmp/strix && pip install -r requirements.txt
           sudo cp /tmp/strix/strix /usr/local/bin/
-          
-          # إضافة PATH
-          echo "export PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
-          echo "export PYTHONPATH=$PYTHONPATH:/tmp/agentic" >> $GITHUB_ENV
 
-      # ----- التشغيل مع تجاوز الأخطاء -----
+          # إضافة PATH للـ Go binaries
+          echo "export PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
+          echo "export PATH=$PATH:/usr/local/go/bin" >> $GITHUB_ENV
+
+      # ----- التحقق من وجود hakrevdns (للتأكد) -----
+      - name: Verify Tools
+        run: |
+          echo "Checking installed tools..."
+          which hakrevdns || echo "hakrevdns not found" && exit 1
+          which subfinder || echo "subfinder not found"
+          echo "All tools verified."
+
+      # ----- التشغيل مع تجاوز الأخطاء (محسّن) -----
       - name: 🚀 Ultimate Scan (All Tools + Error Resilience)
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          PATH: ${{ env.PATH }}:/home/runner/go/bin:/usr/local/go/bin
         run: |
-          set -e  # يوقف السكربت عند أي خطأ غير متوقع
+          set +e  # لا نوقف عند أي خطأ (للمرونة)
           mkdir -p reports logs
-          
-          # دالة لتسجيل الأخطاء ومواصلة التشغيل
+
           run_safe() {
             echo "[*] Running: $1"
             timeout 300 bash -c "$1" 2>&1 | tee -a logs/errors.log || {
@@ -64,8 +73,8 @@ jobs:
               echo "ERROR: $1" >> logs/failed_commands.txt
             }
           }
-          
-          echo "# 🛡️ ULTIMATE BUG BOUNTY REPORT (All Power Tools)" > reports/FINAL.md
+
+          echo "# 🛡️ ULTIMATE BUG BOUNTY REPORT" > reports/FINAL.md
           echo "**Date:** $(date)" >> reports/FINAL.md
           echo "**Targets:** $(cat config/targets.txt | tr '\n' ' ')" >> reports/FINAL.md
           echo "" >> reports/FINAL.md
@@ -75,14 +84,13 @@ jobs:
             echo "🎯 TARGET: $target" | tee -a reports/FINAL.md
             echo "========================================" | tee -a reports/FINAL.md
 
-            # ----- المرحلة 1: جمع المعلومات القوي -----
+            # ----- المرحلة 1: الاستطلاع القوي -----
             echo "[1/6] POWER RECON (BBOT + Subfinder + Assetfinder + Katana)..." >> reports/FINAL.md
-            
             run_safe "bbot -t $target -f subdomain-enum -o reports/bbot_${target}.json"
             run_safe "subfinder -d $target -silent -o reports/sub_${target}.txt"
             run_safe "assetfinder -subs-only $target > reports/asset_${target}.txt"
             run_safe "katana -u https://$target -d 3 -o reports/katana_${target}.txt"
-            
+
             # دمج النطاقات
             cat reports/bbot_${target}.json | jq -r '.hosts[]' 2>/dev/null > reports/all_${target}.txt || true
             cat reports/sub_${target}.txt >> reports/all_${target}.txt 2>/dev/null || true
@@ -95,13 +103,13 @@ jobs:
             run_safe "httpx -l reports/all_${target}.txt -silent -o reports/alive_${target}.txt"
             run_safe "httprobe -c 50 -t 3000 < reports/all_${target}.txt > reports/probe_${target}.txt"
 
-            # ----- المرحلة 3: Fuzzing (اكتشاف الملفات المخفية) -----
+            # ----- المرحلة 3: Fuzzing واكتشاف الملفات -----
             echo "[3/6] FUZZING (FFUF + WayBackURLs)..." >> reports/FINAL.md
             run_safe "ffuf -u https://$target/FUZZ -w /usr/share/wordlists/dirb/common.txt -o reports/ffuf_${target}.json"
             run_safe "waybackurls $target > reports/wayback_${target}.txt"
             run_safe "hakrawler -url https://$target -depth 3 -plain > reports/hakrawler_${target}.txt"
 
-            # ----- المرحلة 4: الذكاء الاصطناعي (Agentic + AIPTX + Riftor) -----
+            # ----- المرحلة 4: الذكاء الاصطناعي -----
             echo "[4/6] AI-POWERED HUNT (Agentic + AIPTX + Riftor)..." >> reports/FINAL.md
             if [ -n "$DEEPSEEK_API_KEY" ]; then
               run_safe "bughunter recon $target --ai deepseek --output reports/agentic_recon_${target}.json"
@@ -121,7 +129,7 @@ jobs:
             run_safe "nuclei -l reports/alive_${target}.txt -severity low,medium,high,critical -o reports/nuclei_${target}.txt"
 
             # ----- تجميع التقرير النهائي -----
-            echo "## 🔍 SUBDOMAINS (All Sources)" >> reports/FINAL.md
+            echo "## 🔍 SUBDOMAINS" >> reports/FINAL.md
             cat reports/all_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
             echo "" >> reports/FINAL.md
 
@@ -141,7 +149,7 @@ jobs:
             cat reports/nuclei_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "No vulnerabilities found" >> reports/FINAL.md
             echo "" >> reports/FINAL.md
 
-            echo "## 📂 FILES DISCOVERED (FFUF + Wayback)" >> reports/FINAL.md
+            echo "## 📂 FILES DISCOVERED" >> reports/FINAL.md
             cat reports/ffuf_${target}.json | jq -r '.results[].url' 2>/dev/null >> reports/FINAL.md || echo "None" >> reports/FINAL.md
             cat reports/wayback_${target}.txt >> reports/FINAL.md 2>/dev/null || true
             echo "" >> reports/FINAL.md
@@ -150,14 +158,11 @@ jobs:
           done < config/targets.txt
 
           echo "✅ Scan completed." >> reports/FINAL.md
-          
-          # إحصائيات
           echo "## 📊 STATISTICS" >> reports/FINAL.md
           echo "- Total targets: $(cat config/targets.txt | wc -l)" >> reports/FINAL.md
           echo "- Failed commands: $(cat logs/failed_commands.txt 2>/dev/null | wc -l)" >> reports/FINAL.md
-          echo "- Logs: See `logs/errors.log`" >> reports/FINAL.md
 
-      # ----- رفع التقارير -----
+      # ----- رفع التقارير والسجلات -----
       - name: 📤 Upload Reports & Logs
         uses: actions/upload-artifact@v4
         with:
