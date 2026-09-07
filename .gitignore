@@ -4,4 +4,3 @@ reports/
 *.log
 *.tmp
 __pycache__/
-tools/
