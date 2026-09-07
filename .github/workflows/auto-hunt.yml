@@ -1,4 +1,4 @@
-name: 🤖 Ultimate Bug Bounty (Hack Everything)
+name: 🤖 ULTIMATE Pentesting (All Tools)
 on:
   schedule:
     - cron: '0 */4 * * *'
@@ -7,15 +7,15 @@ on:
 jobs:
   hunt:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install All Tools (Free & Powerful)
+      - name: Install All Tools
         run: |
           sudo apt update
           sudo apt install -y git golang-go python3-pip jq nmap masscan
-          
+
           # أدوات Go الأساسية
           go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
           go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
@@ -23,40 +23,32 @@ jobs:
           go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
           go install -v github.com/ffuf/ffuf/v2@latest
           go install -v github.com/tomnomnom/waybackurls@latest
-          go install -v github.com/tomnomnom/gf@latest
           go install -v github.com/tomnomnom/assetfinder@latest
-          go install -v github.com/tomnomnom/httprobe@latest
-          go install -v github.com/lc/gau/v2/cmd/gau@latest
-          
-          # أدوات XSS و SQLi
-          go install -v github.com/hahwul/dalfox/v2@latest
-          go install -v github.com/Emoe/kxss@latest
-          
-          # أدوات WAF و معلومات
-          pip install wafw00f
-          pip install git+https://github.com/Awarexone/Agentic-Bug-Hunter.git
-          
+          go install -v github.com/OWASP/Amass/v3/...@master
+
+          # أدوات الاستغلال (Strix)
+          git clone https://github.com/usestrix/strix.git /tmp/strix
+          cd /tmp/strix && pip install -r requirements.txt
+          sudo cp /tmp/strix/strix /usr/local/bin/
+
+          # أدوات مسح الثغرات (ONUS)
+          pip install git+https://github.com/maverickaayush/ONUS.git
+
+          # أدوات تجاوز الجدران النارية (XSSHunt)
+          go install -v github.com/Serdar715/xsshunt@latest
+
+          # أدوات اكتشاف المعلومات الحساسة (Nosey Parker)
+          go install -v github.com/praetorian-inc/noseyparker@latest
+
           # تحديث قوالب Nuclei
           nuclei -update-templates
-          
-          # تثبيت gf patterns
-          mkdir -p ~/.gf
-          git clone https://github.com/1ndianl33t/Gf-Patterns ~/gf-patterns
-          cp ~/gf-patterns/*.json ~/.gf/
-          
-          # تثبيت SQLmap (خفيف)
-          git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git /tmp/sqlmap
-          sudo ln -s /tmp/sqlmap/sqlmap.py /usr/local/bin/sqlmap
-          
-          # إضافة PATH
+
           echo "export PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
 
-      - name: 🔥 Ultimate Exploitation Scan
+      - name: 🔥 Ultimate Scan (All Tools)
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          PATH: ${{ env.PATH }}:/home/runner/go/bin
         run: |
-          set +e
           mkdir -p reports logs
           
           run_safe() {
@@ -67,107 +59,66 @@ jobs:
             }
           }
           
-          echo "# 🛡️ ULTIMATE BUG BOUNTY (HACK EVERYTHING)" > reports/FINAL.md
+          echo "# 🛡️ ULTIMATE PENTESTING REPORT" > reports/FINAL.md
           echo "**Date:** $(date)" >> reports/FINAL.md
-          echo "**Targets:** $(cat config/targets.txt | tr '\n' ' ')" >> reports/FINAL.md
           echo "" >> reports/FINAL.md
           
           while read target; do
+            [ -z "$target" ] && continue
             echo "========================================" | tee -a reports/FINAL.md
             echo "🎯 TARGET: $target" | tee -a reports/FINAL.md
             echo "========================================" | tee -a reports/FINAL.md
             
-            # ----- 1. RECON (Subfinder + Assetfinder + BBOT) -----
-            echo "[1/7] RECON (All Sources)..." >> reports/FINAL.md
+            # ----- 1. RECON (Amass + Subfinder + Assetfinder) -----
+            echo "[1/6] RECON (Amass + Subfinder)..." >> reports/FINAL.md
+            run_safe "amass enum -d $target -o reports/amass_${target}.txt"
             run_safe "subfinder -d $target -silent -o reports/sub_${target}.txt"
             run_safe "assetfinder -subs-only $target > reports/asset_${target}.txt"
-            # BBOT (إن وجد)
-            run_safe "bbot -t $target -f subdomain-enum -o reports/bbot_${target}.json"
             
-            # دمج جميع النطاقات
-            cat reports/sub_${target}.txt reports/asset_${target}.txt > reports/all_${target}.txt
-            cat reports/bbot_${target}.json | jq -r '.hosts[]' 2>/dev/null >> reports/all_${target}.txt
+            # دمج النطاقات
+            cat reports/amass_${target}.txt reports/sub_${target}.txt reports/asset_${target}.txt > reports/all_${target}.txt
             sort -u reports/all_${target}.txt -o reports/all_${target}.txt
-            echo "Subdomains found: $(wc -l < reports/all_${target}.txt)" >> reports/FINAL.md
             
             # ----- 2. ALIVE HOSTS (httpx) -----
-            echo "[2/7] ALIVE HOSTS (httpx)..." >> reports/FINAL.md
+            echo "[2/6] ALIVE HOSTS (httpx)..." >> reports/FINAL.md
             run_safe "httpx -l reports/all_${target}.txt -silent -o reports/alive_${target}.txt"
-            echo "Alive hosts: $(wc -l < reports/alive_${target}.txt)" >> reports/FINAL.md
             
-            # ----- 3. WAF DETECTION (wafw00f) -----
-            echo "[3/7] WAF DETECTION (wafw00f)..." >> reports/FINAL.md
-            for host in $(cat reports/alive_${target}.txt | head -10); do
-              run_safe "wafw00f $host -o reports/waf_${host}.txt"
-            done
+            # ----- 3. SCANNING (ONUS + Nosey Parker) -----
+            echo "[3/6] SCANNING (ONUS + Nosey Parker)..." >> reports/FINAL.md
+            run_safe "onus scan $target --output reports/onus_${target}.json"
+            run_safe "noseyparker scan $target --output reports/noseyparker_${target}.json"
             
-            # ----- 4. GATHERING URLs (Katana + Gau + Wayback) -----
-            echo "[4/7] GATHERING URLs (Katana + Gau + Wayback)..." >> reports/FINAL.md
-            run_safe "katana -u https://$target -d 3 -o reports/katana_${target}.txt"
-            run_safe "gau --subs $target > reports/gau_${target}.txt"
-            run_safe "waybackurls $target > reports/wayback_${target}.txt"
+            # ----- 4. EXPLOITATION (Strix) -----
+            echo "[4/6] EXPLOITATION (Strix - PoC)..." >> reports/FINAL.md
+            run_safe "strix --target $target --output reports/strix_${target}.json"
             
-            # دمج الروابط
-            cat reports/katana_${target}.txt reports/gau_${target}.txt reports/wayback_${target}.txt > reports/urls_${target}.txt
-            sort -u reports/urls_${target}.txt -o reports/urls_${target}.txt
-            echo "URLs collected: $(wc -l < reports/urls_${target}.txt)" >> reports/FINAL.md
+            # ----- 5. WAF BYPASS (XSSHunt) -----
+            echo "[5/6] WAF BYPASS (XSSHunt)..." >> reports/FINAL.md
+            run_safe "xsshunt -u https://$target -o reports/xsshunt_${target}.txt"
             
-            # ----- 5. XSS & SQLi SCANNING (Dalfox + KXSS + SQLmap) -----
-            echo "[5/7] XSS & SQLi SCANNING (Dalfox + SQLmap)..." >> reports/FINAL.md
-            run_safe "dalfox file reports/urls_${target}.txt -o reports/dalfox_${target}.txt"
-            run_safe "kxss -i reports/urls_${target}.txt > reports/kxss_${target}.txt"
-            # SQLmap على المعاملات
-            grep -E "\?.*=" reports/urls_${target}.txt | head -20 > reports/sqli_targets.txt
-            run_safe "sqlmap -m reports/sqli_targets.txt --batch --level=1 --risk=1 --output-dir=reports/sqlmap_${target}"
-            
-            # ----- 6. FUZZING (FFUF) للملفات والمسارات -----
-            echo "[6/7] FUZZING (FFUF)..." >> reports/FINAL.md
-            run_safe "ffuf -u https://$target/FUZZ -w /usr/share/wordlists/dirb/common.txt -o reports/ffuf_${target}.json"
-            # استخراج المسارات المكتشفة
-            cat reports/ffuf_${target}.json | jq -r '.results[].url' > reports/paths_${target}.txt
-            
-            # ----- 7. NUCLEI (Vulnerabilities + Exploitation) -----
-            echo "[7/7] NUCLEI (CVEs + Exploits)..." >> reports/FINAL.md
+            # ----- 6. NUCLEI (Final Scan) -----
+            echo "[6/6] NUCLEI (Vulnerabilities)..." >> reports/FINAL.md
             run_safe "nuclei -l reports/alive_${target}.txt -severity low,medium,high,critical -o reports/nuclei_${target}.txt"
-            # قوالب exploitation و bypass
-            run_safe "nuclei -l reports/alive_${target}.txt -tags exploit,waf-bypass -o reports/nuclei_exploit_${target}.txt"
-            run_safe "nuclei -l reports/alive_${target}.txt -tags info,exposure -o reports/nuclei_info_${target}.txt"
             
             # ----- FINAL REPORT -----
-            echo "## 🔍 SUBDOMAINS" >> reports/FINAL.md
+            echo "## 🔍 RECON RESULTS" >> reports/FINAL.md
             cat reports/all_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
             echo "" >> reports/FINAL.md
             
-            echo "## 🟢 ALIVE HOSTS" >> reports/FINAL.md
-            cat reports/alive_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
+            echo "## 🛡️ SCAN RESULTS" >> reports/FINAL.md
+            cat reports/onus_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
             echo "" >> reports/FINAL.md
             
-            echo "## 🛡️ WAF DETECTION" >> reports/FINAL.md
-            cat reports/waf_*.txt >> reports/FINAL.md 2>/dev/null || echo "No WAF detected" >> reports/FINAL.md
+            echo "## ⚡ EXPLOITATION RESULTS (Strix)" >> reports/FINAL.md
+            cat reports/strix_${target}.json >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
+            echo "" >> reports/FINAL.md
+            
+            echo "## 🚧 WAF BYPASS RESULTS" >> reports/FINAL.md
+            cat reports/xsshunt_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
             echo "" >> reports/FINAL.md
             
             echo "## 🚨 NUCLEI VULNERABILITIES" >> reports/FINAL.md
             cat reports/nuclei_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
-            echo "" >> reports/FINAL.md
-            
-            echo "## ⚡ NUCLEI EXPLOITS & BYPASS" >> reports/FINAL.md
-            cat reports/nuclei_exploit_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
-            echo "" >> reports/FINAL.md
-            
-            echo "## 🔓 INFORMATION DISCLOSURE" >> reports/FINAL.md
-            cat reports/nuclei_info_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
-            echo "" >> reports/FINAL.md
-            
-            echo "## 💥 XSS FINDINGS (Dalfox)" >> reports/FINAL.md
-            cat reports/dalfox_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
-            echo "" >> reports/FINAL.md
-            
-            echo "## 🗄️ SQLi FINDINGS (SQLmap)" >> reports/FINAL.md
-            ls -la reports/sqlmap_${target} >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
-            echo "" >> reports/FINAL.md
-            
-            echo "## 📂 PATHS & FILES (FFUF)" >> reports/FINAL.md
-            cat reports/paths_${target}.txt >> reports/FINAL.md 2>/dev/null || echo "None" >> reports/FINAL.md
             echo "" >> reports/FINAL.md
             
             echo "---" >> reports/FINAL.md
@@ -175,14 +126,11 @@ jobs:
           done < config/targets.txt
           
           echo "✅ Scan completed." >> reports/FINAL.md
-          echo "## 📊 STATISTICS" >> reports/FINAL.md
-          echo "- Total targets: $(cat config/targets.txt | wc -l)" >> reports/FINAL.md
-          echo "- Failed commands: $(cat logs/failed_commands.txt 2>/dev/null | wc -l)" >> reports/FINAL.md
 
-      - name: 📤 Upload Reports & Logs
+      - name: 📤 Upload Reports
         uses: actions/upload-artifact@v4
         with:
-          name: Ultimate-Exploit-Reports
+          name: Ultimate-Reports
           path: |
             reports/
             logs/
