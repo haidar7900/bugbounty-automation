@@ -1,190 +1,59 @@
-name: 🤖 ULTIMATE Bug Bounty (24/7 Auto-Hunt)
+name: 🤖 ULTIMATE Bug Bounty (Parallel)
+
 on:
   schedule:
-    - cron: '0 */4 * * *'   # كل 4 ساعات
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 jobs:
-  # ============ Job 1: تجهيز الأهداف وتوزيعها ============
   prepare:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.split.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: 🔍 Auto-Fetch HackerOne Scopes
-        env:
-          H1_TOKEN: ${{ secrets.H1_TOKEN }}
-          H1_USERNAME: ${{ secrets.H1_USERNAME }}
+      - name: 🔍 Fetch Public Targets
         run: |
-          if [ -n "$H1_TOKEN" ] && [ -n "$H1_USERNAME" ]; then
-            echo "📡 Fetching H1 scopes with bbscope..."
-            bbscope h1 -t "$H1_TOKEN" -u "$H1_USERNAME" -b -o t > config/h1_scopes.txt
-          else
-            echo "📡 Fetching public scopes..."
-            curl -s https://raw.githubusercontent.com/arkadiyt/bounty-targets-data/main/data/domains.txt > config/h1_scopes.txt
-          fi
-          echo "✅ Found $(wc -l < config/h1_scopes.txt) targets"
-
-      # تقسيم القائمة الكبيرة إلى مجموعات (chunks) بدل معالجتها تسلسلياً
-      - name: 📦 Split targets into chunks
+          curl -s https://raw.githubusercontent.com/arkadiyt/bounty-targets-data/main/data/domains.txt | head -500 > config/targets.txt
+          echo "✅ Found $(wc -l < config/targets.txt) targets"
+      - name: 📦 Split into chunks
         id: split
         run: |
-          split -l 20 config/h1_scopes.txt config/chunk_
-          MATRIX=$(ls config/chunk_* | jq -R -s -c 'split("\n")[:-1]')
-          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          mkdir -p chunks
+          split -l 30 config/targets.txt chunks/chunk_
+          echo "matrix=$(ls chunks/chunk_* | jq -R -s -c 'split("\n")[:-1]')" >> $GITHUB_OUTPUT
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: target-chunks
-          path: config/chunk_*
-
-  # ============ Job 2: الفحص المتوازي (Matrix) ============
   hunt:
     needs: prepare
     runs-on: ubuntu-latest
-    timeout-minutes: 120
     strategy:
       fail-fast: false
-      max-parallel: 5          # 5 مجموعات تشتغل بنفس الوقت
+      max-parallel: 3
       matrix:
         chunk: ${{ fromJson(needs.prepare.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: target-chunks
-          path: config/
-
-      - name: Install All Tools
+      - name: Install core tools
         run: |
-          chmod +x setup.sh
-          ./setup.sh
+          sudo apt update
+          sudo apt install -y git golang-go python3-pip jq
+          go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+          go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+          go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+          pip install aiptx riftor
           echo "export PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
-
-      - name: 🔄 Update Nuclei Templates
-        run: nuclei -update-templates -silent || true
-
-      - name: 🚀 Scan Chunk
-        env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      - name: 🔥 Scan chunk
         run: |
-          mkdir -p reports logs
-          CHUNK_FILE="${{ matrix.chunk }}"
-          CHUNK_NAME=$(basename "$CHUNK_FILE")
-
-          run_safe() {
-            echo "[*] Running: $1"
-            timeout 300 bash -c "$1" 2>&1 | tee -a logs/errors.log || {
-              echo "[!] Command failed: $1 (continuing...)"
-              echo "ERROR: $1" >> logs/failed_commands.txt
-            }
-          }
-
-          SUMMARY="reports/summary_${CHUNK_NAME}.md"
-          echo "# 🛡️ Chunk Report: $CHUNK_NAME" > "$SUMMARY"
-          echo "**Date:** $(date)" >> "$SUMMARY"
-          echo "" >> "$SUMMARY"
-
+          mkdir -p reports
           while read target; do
             [ -z "$target" ] && continue
-            echo "========================================"
-            echo "🎯 TARGET: $target"
-            echo "========================================"
-
-            DETAIL="reports/detail_${target}.md"
-            echo "# Target: $target" > "$DETAIL"
-
-            # ===== 1. RECON =====
-            run_safe "amass enum -d $target -timeout 5 -o reports/amass_${target}.txt"
-            run_safe "subfinder -d $target -silent -o reports/sub_${target}.txt"
-            run_safe "assetfinder -subs-only $target > reports/asset_${target}.txt"
-            run_safe "python tools/ott3rrhunt/ott3rrhunt.py -d $target -o reports/ott3rr_${target}.txt"
-            run_safe "python tools/theharvester/theHarvester.py -d $target -b all -f reports/harvester_${target}.html"
-
-            cat reports/amass_${target}.txt reports/sub_${target}.txt reports/asset_${target}.txt 2>/dev/null \
-              | sort -u > reports/all_${target}.txt
-            SUB_COUNT=$(wc -l < reports/all_${target}.txt)
-
-            # ===== 2. ALIVE HOSTS =====
-            run_safe "httpx -l reports/all_${target}.txt -silent -o reports/alive_${target}.txt"
-            ALIVE_COUNT=$(wc -l < reports/alive_${target}.txt 2>/dev/null || echo 0)
-
-            # ===== جمع URLs (مطلوب لـ kxss و dalfox) =====
-            run_safe "cat reports/alive_${target}.txt | gau --subs > reports/urls_${target}.txt"
-            run_safe "cat reports/alive_${target}.txt | waybackurls >> reports/urls_${target}.txt"
-            sort -u reports/urls_${target}.txt -o reports/urls_${target}.txt 2>/dev/null
-
-            # ===== 3. SCANNING =====
-            run_safe "onus scan $target --output reports/onus_${target}.json"
-            run_safe "noseyparker scan $target --output reports/noseyparker_${target}.json"
-            run_safe "python tools/bugtrace/main.py --target $target --output reports/bugtrace_${target}.json"
-
-            # ===== 4. AI HUNT =====
-            run_safe "python tools/dark_wxlf/main.py -d $target -o reports/darkwxlf_${target}.json"
-            run_safe "python tools/pinakastra/pinakastra.py -d $target -o reports/pinakastra_${target}.json"
-            run_safe "python tools/metatron/metatron.py -d $target -o reports/metatron_${target}.json"
-
-            # ===== 5. EXPLOITATION =====
-            run_safe "strix --target $target --output reports/strix_${target}.json"
-            run_safe "python tools/reaper/reaper.py -d $target -o reports/reaper_${target}.json"
-
-            # ===== 6. WAF BYPASS & XSS =====
-            run_safe "xsshunt -u https://$target -o reports/xsshunt_${target}.txt"
-            run_safe "dalfox file reports/urls_${target}.txt -o reports/dalfox_${target}.txt"
-            run_safe "kxss < reports/urls_${target}.txt > reports/kxss_${target}.txt"
-
-            # ===== 7. NUCLEI =====
-            run_safe "nuclei -l reports/alive_${target}.txt -severity low,medium,high,critical -o reports/nuclei_${target}.txt"
-            NUCLEI_COUNT=$(wc -l < reports/nuclei_${target}.txt 2>/dev/null || echo 0)
-
-            # ===== دمج النتائج الخام بتقرير التفاصيل (منفصل عن الملخص) =====
-            for f in all alive nuclei xsshunt dalfox kxss; do
-              echo "## $f" >> "$DETAIL"
-              cat "reports/${f}_${target}.txt" >> "$DETAIL" 2>/dev/null || echo "None" >> "$DETAIL"
-            done
-            for f in onus noseyparker bugtrace darkwxlf pinakastra metatron strix reaper; do
-              echo "## $f" >> "$DETAIL"
-              cat "reports/${f}_${target}.json" >> "$DETAIL" 2>/dev/null || echo "None" >> "$DETAIL"
-            done
-
-            # ===== سطر ملخص واحد بس بملف الـ SUMMARY (يمنع انفجار الحجم) =====
-            echo "- **$target** → Subdomains: $SUB_COUNT | Alive: $ALIVE_COUNT | Nuclei findings: $NUCLEI_COUNT" >> "$SUMMARY"
-
-          done < "$CHUNK_FILE"
-
-      - name: 📤 Upload Chunk Reports
+            echo "🔥 Scanning $target"
+            subfinder -d "$target" -silent -o "reports/sub_$target.txt" || true
+            httpx -l "reports/sub_$target.txt" -silent -o "reports/alive_$target.txt" || true
+            nuclei -l "reports/alive_$target.txt" -severity low,medium,high,critical -o "reports/nuclei_$target.txt" || true
+          done < "${{ matrix.chunk }}"
+      - name: 📤 Upload reports
         uses: actions/upload-artifact@v4
         with:
-          name: reports-${{ strategy.job-index }}
-          path: |
-            reports/
-            logs/
-
-  # ============ Job 3: دمج كل التقارير بنهاية التشغيل ============
-  merge:
-    needs: hunt
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: reports-*
-          path: all-reports
-          merge-multiple: true
-
-      - name: 🧩 Build Final Summary
-        run: |
-          echo "# 🛡️ ULTIMATE BUG BOUNTY — FINAL SUMMARY" > FINAL.md
-          echo "**Date:** $(date)" >> FINAL.md
-          echo "" >> FINAL.md
-          cat all-reports/summary_*.md >> FINAL.md 2>/dev/null || echo "No summaries found" >> FINAL.md
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Ultimate-Final-Report
-          path: |
-            FINAL.md
-            all-reports/
+          name: chunk-reports-${{ strategy.job-index }}
+          path: reports/

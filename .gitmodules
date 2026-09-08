@@ -1,18 +1,6 @@
 [submodule "tools/Agentic-Bug-Hunter"]
-	path = tools/Agentic-Bug-Hunter
-	url = https://github.com/Awarexone/Agentic-Bug-Hunter.git
-[submodule "tools/BugTraceAI-CLI"]
-	path = tools/BugTraceAI-CLI
-	url = https://github.com/BugTraceAI/BugTraceAI-CLI.git
-[submodule "tools/wp-hunter-mcp"]
-	path = tools/wp-hunter-mcp
-	url = https://github.com/RaheesAhmed/wp-hunter-mcp.git
-[submodule "tools/HexStrike-AI"]
-	path = tools/HexStrike-AI
-	url = https://github.com/morpheusc/Hexstrike-AI.git
-[submodule "tools/Pentest-Agents"]
-	path = tools/Pentest-Agents
-	url = https://github.com/H-mmer/pentest-agents.git
+  path = tools/Agentic-Bug-Hunter
+  url = https://github.com/Awarexone/Agentic-Bug-Hunter.git
 [submodule "tools/hawkeye"]
-	path = tools/hawkeye
-	url = https://github.com/Btr4k/bugbounty-agent.git
+  path = tools/hawkeye
+  url = https://github.com/Btr4k/bugbounty-agent.git
