@@ -1,4 +1,4 @@
-name: 🤖 ULTIMATE Exploitation & Bypass
+name: 🤖 ULTIMATE Bug Bounty (All Advanced Tools)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
 jobs:
   hunt:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
 
@@ -18,19 +18,17 @@ jobs:
           ./setup.sh
           echo "export PATH=$PATH:$(go env GOPATH)/bin:/usr/local/bin" >> $GITHUB_ENV
 
-      - name: 🎯 Full Attack Pipeline
+      - name: 🚀 Advanced Scan Pipeline
         run: |
           mkdir -p reports logs
           
-          # دالة لتشغيل الأوامر مع تجاوز الأخطاء
           run_safe() {
             echo "[*] Running: $1"
-            timeout 300 bash -c "$1" 2>&1 | tee -a logs/errors.log || {
+            timeout 600 bash -c "$1" 2>&1 | tee -a logs/errors.log || {
               echo "[!] Command failed: $1 (continuing...)"
             }
           }
           
-          # التأكد من وجود أهداف
           if [ ! -s config/targets.txt ]; then
             echo "example.com" > config/targets.txt
           fi
@@ -41,58 +39,69 @@ jobs:
             echo "🎯 TARGET: $target"
             echo "========================================"
             
-            # ----- 1. RECON (استطلاع كامل) -----
-            echo "[1/6] RECON..."
+            # ----- 1. RECON (Core + AIRecon + DetectiveJoe + ReconSuite) -----
+            echo "[1/9] RECON (AIRecon + DetectiveJoe + ReconSuite)..." >> reports/FINAL.md
             run_safe "subfinder -d $target -silent -o reports/sub_${target}.txt"
             run_safe "amass enum -d $target -o reports/amass_${target}.txt"
             run_safe "assetfinder -subs-only $target > reports/asset_${target}.txt"
+            run_safe "python tools/AIRecon/airecon.py -t $target -o reports/airecon_${target}.json"
+            run_safe "python tools/DetectiveJoe/detectivejoe.py -d $target -o reports/joe_${target}.json"
+            run_safe "python tools/ReconSuite-AI/reconsuite.py -d $target -o reports/reconsuite_${target}.json"
             cat reports/sub_${target}.txt reports/amass_${target}.txt reports/asset_${target}.txt > reports/all_${target}.txt
             sort -u reports/all_${target}.txt -o reports/all_${target}.txt
             
             # ----- 2. ALIVE HOSTS -----
-            echo "[2/6] ALIVE HOSTS..."
+            echo "[2/9] ALIVE HOSTS..." >> reports/FINAL.md
             run_safe "httpx -l reports/all_${target}.txt -silent -o reports/alive_${target}.txt"
             
-            # ----- 3. PATH DISCOVERY (FFUF + Dirsearch) -----
-            echo "[3/6] PATH DISCOVERY..."
-            run_safe "ffuf -u https://$target/FUZZ -w /usr/share/wordlists/dirb/common.txt -ac -o reports/ffuf_${target}.json"
-            run_safe "python tools/dirsearch/dirsearch.py -u https://$target -e php,html,js,bak,txt -o reports/dirsearch_${target}.txt"
+            # ----- 3. PARAM SPECTER (كشف المعاملات المخفية) -----
+            echo "[3/9] PARAM SPECTER..." >> reports/FINAL.md
+            run_safe "python tools/ParamSpecter-Crawler/paramspecter.py -u https://$target -o reports/params_${target}.json"
             
-            # ----- 4. XSS & WAF BYPASS (Dalfox + XSSHunt) -----
-            echo "[4/6] XSS & WAF BYPASS..."
+            # ----- 4. AI EXPLOITATION (Pinakastra) -----
+            echo "[4/9] AI EXPLOITATION (Pinakastra)..." >> reports/FINAL.md
+            run_safe "python tools/Pinakastra/pinakastra.py -d $target -o reports/pinakastra_${target}.json"
+            
+            # ----- 5. XSS & WAF BYPASS -----
+            echo "[5/9] XSS & WAF BYPASS..." >> reports/FINAL.md
             run_safe "dalfox url https://$target --waf-evasion -o reports/dalfox_${target}.txt"
-            run_safe "xsshunt -u https://$target --bypass -o reports/xsshunt_${target}.txt"
+            run_safe "kxss -i reports/urls_${target}.txt > reports/kxss_${target}.txt"
             
-            # ----- 5. EXPLOITATION (Commix + Strix) -----
-            echo "[5/6] EXPLOITATION (RCE + PoC)..."
-            run_safe "commix --url https://$target --batch --output-dir reports/commix_${target}"
-            run_safe "strix --target $target --output reports/strix_${target}.json"
+            # ----- 6. NoSQL INJECTION (NoSQLMap) -----
+            echo "[6/9] NoSQL INJECTION..." >> reports/FINAL.md
+            run_safe "python tools/NoSQLMap/nosqlmap.py --url https://$target --output reports/nosql_${target}.json"
             
-            # ----- 6. NUCLEI (جميع الثغرات مع قوالب الاستغلال) -----
-            echo "[6/6] NUCLEI (All CVEs + Exploits)..."
+            # ----- 7. AI BUG HUNT (BugHawk) -----
+            echo "[7/9] AI BUG HUNT (BugHawk)..." >> reports/FINAL.md
+            run_safe "python tools/BugHawk-AI/bughawk.py -t $target -o reports/bughawk_${target}.json"
+            
+            # ----- 8. NUCLEI (جميع الثغرات) -----
+            echo "[8/9] NUCLEI (All CVEs + Exploits)..." >> reports/FINAL.md
             run_safe "nuclei -l reports/alive_${target}.txt -severity low,medium,high,critical -o reports/nuclei_${target}.txt"
             run_safe "nuclei -l reports/alive_${target}.txt -tags exploit,waf-bypass -o reports/nuclei_exploits_${target}.txt"
             
-            # ----- FINAL REPORT SUMMARY -----
+            # ----- 9. FINAL SUMMARY -----
+            echo "[9/9] FINAL SUMMARY..." >> reports/FINAL.md
             echo "## 🎯 Target: $target" >> reports/FINAL.md
             echo "" >> reports/FINAL.md
-            echo "### 🔍 Subdomains Found: $(wc -l < reports/all_${target}.txt)" >> reports/FINAL.md
-            echo "### 🟢 Alive Hosts: $(wc -l < reports/alive_${target}.txt)" >> reports/FINAL.md
-            echo "### 📂 Paths Found: $(wc -l < reports/ffuf_${target}.json 2>/dev/null || echo 0)" >> reports/FINAL.md
-            echo "### 💥 XSS Findings: $(wc -l < reports/dalfox_${target}.txt 2>/dev/null || echo 0)" >> reports/FINAL.md
-            echo "### 🚨 Nuclei Vulnerabilities: $(wc -l < reports/nuclei_${target}.txt 2>/dev/null || echo 0)" >> reports/FINAL.md
-            echo "### ⚡ Exploitable Findings: $(wc -l < reports/nuclei_exploits_${target}.txt 2>/dev/null || echo 0)" >> reports/FINAL.md
+            echo "### 📊 Statistics" >> reports/FINAL.md
+            echo "- Subdomains: $(wc -l < reports/all_${target}.txt)" >> reports/FINAL.md
+            echo "- Alive Hosts: $(wc -l < reports/alive_${target}.txt)" >> reports/FINAL.md
+            echo "- Parameters Found: $(cat reports/params_${target}.json | jq '.params | length' 2>/dev/null || echo 0)" >> reports/FINAL.md
+            echo "- Pinakastra Exploits: $(cat reports/pinakastra_${target}.json | jq '.exploits | length' 2>/dev/null || echo 0)" >> reports/FINAL.md
+            echo "- NoSQL Findings: $(cat reports/nosql_${target}.json | jq '.findings | length' 2>/dev/null || echo 0)" >> reports/FINAL.md
+            echo "- Nuclei Vulnerabilities: $(wc -l < reports/nuclei_${target}.txt 2>/dev/null || echo 0)" >> reports/FINAL.md
             echo "" >> reports/FINAL.md
             echo "---" >> reports/FINAL.md
             
           done < config/targets.txt
           
-          echo "✅ Scan completed. Check reports/FINAL.md"
+          echo "✅ Scan completed."
 
-      - name: 📤 Upload All Reports
+      - name: 📤 Upload Reports
         uses: actions/upload-artifact@v4
         with:
-          name: Ultimate-Exploit-Reports
+          name: Ultimate-Advanced-Reports
           path: |
             reports/
             logs/

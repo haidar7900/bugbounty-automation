@@ -7,3 +7,39 @@
 [submodule "tools/BBOT"]
 	path = tools/BBOT
 	url = https://github.com/blacklanternsecurity/bbot.git
+
+[submodule "tools/Pinakastra"]
+	path = tools/Pinakastra
+	url = https://github.com/who0xac/Pinakastra.git
+
+[submodule "tools/ParamSpecter-Crawler"]
+	path = tools/ParamSpecter-Crawler
+	url = https://github.com/Boltx099/ParamSpecter-Crawler.git
+
+[submodule "tools/AIRecon"]
+	path = tools/AIRecon
+	url = https://github.com/Ares-X/AIRecon.git
+
+[submodule "tools/BugHawk-AI"]
+	path = tools/BugHawk-AI
+	url = https://github.com/WhiteJ-stack/BugHawk-AI.git
+
+[submodule "tools/DetectiveJoe"]
+	path = tools/DetectiveJoe
+	url = https://github.com/dkhuynh0310/DetectiveJoe.git
+
+[submodule "tools/ReconSuite-AI"]
+	path = tools/ReconSuite-AI
+	url = https://github.com/devx-0/ReconSuite-AI.git
+
+[submodule "tools/NoSQLMap"]
+	path = tools/NoSQLMap
+	url = https://github.com/codingo/NoSQLMap.git
+
+[submodule "tools/HexStrike-AI"]
+	path = tools/HexStrike-AI
+	url = https://github.com/morpheusc/Hexstrike-AI.git
+
+[submodule "tools/advanced-bugbounty-mcp"]
+	path = tools/advanced-bugbounty-mcp
+	url = https://github.com/0xN1x0/advanced-bugbounty-mcp.git
