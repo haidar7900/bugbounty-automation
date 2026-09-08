@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="ar" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔥 haidar7900 · Ultimate Bug Bounty Dashboard</title>
+    <!-- Font Awesome 6 (مجاني) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        body {
+            min-height: 100vh;
+            background: linear-gradient(145deg, #0b0e1a 0%, #1a1f33 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+        }
+        /* خلفية شبكية متحركة */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 255, 200, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 200, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .dashboard {
+            max-width: 1200px;
+            width: 100%;
+            background: rgba(20, 28, 58, 0.7);
+            backdrop-filter: blur(20px);
+            border-radius: 48px;
+            padding: 40px 40px 50px;
+            border: 1px solid rgba(0, 255, 200, 0.2);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,255,200,0.05) inset;
+            position: relative;
+            z-index: 1;
+            transition: all 0.3s ease;
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 40px;
+            border-bottom: 1px solid rgba(0, 255, 200, 0.1);
+            padding-bottom: 25px;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .brand i {
+            font-size: 42px;
+            color: #00ffc8;
+            filter: drop-shadow(0 0 20px rgba(0,255,200,0.3));
+        }
+        .brand h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #ffffff 0%, #00ffc8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+        }
+        .brand span {
+            font-size: 14px;
+            color: #8892b0;
+            background: rgba(0,255,200,0.08);
+            padding: 4px 14px;
+            border-radius: 40px;
+            border: 1px solid rgba(0,255,200,0.15);
+            -webkit-text-fill-color: #8892b0;
+        }
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(0,255,200,0.06);
+            padding: 10px 22px;
+            border-radius: 60px;
+            border: 1px solid rgba(0,255,200,0.12);
+        }
+        .status-badge .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4ade80;
+            animation: pulse-dot 2s infinite;
+            transition: background 0.3s;
+        }
+        .status-badge .dot.idle { background: #facc15; }
+        .status-badge .dot.running { background: #f97316; animation-duration: 0.6s; }
+        .status-badge .dot.failed { background: #ef4444; }
+        .status-badge .dot.success { background: #4ade80; }
+        @keyframes pulse-dot {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.85); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .status-badge .label {
+            color: #ccd6f6;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .status-badge .time {
+            color: #8892b0;
+            font-size: 12px;
+        }
+
+        /* ===== CARDS ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .stat-card {
+            background: rgba(0, 255, 200, 0.03);
+            border-radius: 24px;
+            padding: 20px 24px;
+            border: 1px solid rgba(0, 255, 200, 0.06);
+            transition: 0.25s ease;
+        }
+        .stat-card:hover {
+            background: rgba(0, 255, 200, 0.07);
+            border-color: rgba(0, 255, 200, 0.15);
+            transform: translateY(-3px);
+        }
+        .stat-card .number {
+            font-size: 32px;
+            font-weight: 700;
+            color: #00ffc8;
+            letter-spacing: -0.5px;
+        }
+        .stat-card .desc {
+            font-size: 13px;
+            color: #8892b0;
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .stat-card .desc i {
+            font-size: 14px;
+            opacity: 0.6;
+        }
+
+        /* ===== BUTTON ===== */
+        .action-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+            margin: 30px 0 40px;
+        }
+        .btn-run {
+            background: linear-gradient(135deg, #00ffc8 0%, #00b894 100%);
+            border: none;
+            padding: 20px 60px;
+            border-radius: 80px;
+            font-size: 22px;
+            font-weight: 700;
+            color: #0b0e1a;
+            display: inline-flex;
+            align-items: center;
+            gap: 18px;
+            cursor: pointer;
+            transition: 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 0 30px rgba(0, 255, 200, 0.2);
+            border: 1px solid rgba(255,255,255,0.15);
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-run:hover:not(:disabled) {
+            transform: scale(1.04);
+            box-shadow: 0 0 50px rgba(0, 255, 200, 0.4);
+        }
+        .btn-run:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: scale(0.97);
+            filter: grayscale(0.6);
+        }
+        .btn-run i {
+            font-size: 28px;
+        }
+        .btn-run .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            transform: scale(0);
+            animation: ripple-anim 0.8s linear;
+            pointer-events: none;
+        }
+        @keyframes ripple-anim {
+            to { transform: scale(4); opacity: 0; }
+        }
+        .btn-run .badge-trigger {
+            font-size: 14px;
+            background: rgba(0,0,0,0.2);
+            padding: 2px 14px;
+            border-radius: 40px;
+            font-weight: 500;
+        }
+
+        .status-msg {
+            font-size: 15px;
+            color: #8892b0;
+            background: rgba(0,255,200,0.04);
+            padding: 12px 28px;
+            border-radius: 60px;
+            border: 1px solid rgba(0,255,200,0.06);
+            min-height: 54px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .status-msg i {
+            color: #00ffc8;
+        }
+        .status-msg .highlight {
+            color: #00ffc8;
+            font-weight: 600;
+        }
+
+        /* ===== REPORTS SECTION ===== */
+        .reports-section {
+            margin-top: 30px;
+            border-top: 1px solid rgba(0, 255, 200, 0.08);
+            padding-top: 30px;
+        }
+        .reports-section h3 {
+            color: #ccd6f6;
+            font-size: 16px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .reports-section h3 i {
+            color: #00ffc8;
+        }
+        .report-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .report-item {
+            background: rgba(0, 255, 200, 0.02);
+            border-radius: 16px;
+            padding: 14px 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(0, 255, 200, 0.04);
+            transition: 0.2s;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .report-item:hover {
+            background: rgba(0, 255, 200, 0.05);
+        }
+        .report-item .info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .report-item .info i {
+            color: #00ffc8;
+            font-size: 18px;
+        }
+        .report-item .info .name {
+            color: #ccd6f6;
+            font-weight: 500;
+        }
+        .report-item .info .date {
+            color: #8892b0;
+            font-size: 13px;
+        }
+        .report-item .download-btn {
+            background: rgba(0, 255, 200, 0.08);
+            border: 1px solid rgba(0, 255, 200, 0.15);
+            padding: 6px 18px;
+            border-radius: 40px;
+            color: #00ffc8;
+            font-size: 13px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .report-item .download-btn:hover {
+            background: rgba(0, 255, 200, 0.15);
+            border-color: #00ffc8;
+        }
+
+        /* ===== FOOTER ===== */
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 13px;
+            color: #495670;
+            border-top: 1px solid rgba(0,255,200,0.05);
+            padding-top: 25px;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .footer a {
+            color: #00ffc8;
+            text-decoration: none;
+            opacity: 0.7;
+            transition: 0.2s;
+        }
+        .footer a:hover { opacity: 1; }
+
+        /* ===== TOKEN INPUT (خفيف) ===== */
+        .token-area {
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 20px;
+            padding: 14px 22px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .token-area label {
+            color: #8892b0;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .token-area input {
+            background: transparent;
+            border: 1px solid rgba(0,255,200,0.15);
+            border-radius: 40px;
+            padding: 8px 20px;
+            color: #ccd6f6;
+            font-size: 14px;
+            flex: 1;
+            min-width: 200px;
+            outline: none;
+            transition: 0.2s;
+        }
+        .token-area input:focus {
+            border-color: #00ffc8;
+            box-shadow: 0 0 20px rgba(0,255,200,0.05);
+        }
+        .token-area .save-token {
+            background: rgba(0,255,200,0.08);
+            border: 1px solid rgba(0,255,200,0.12);
+            color: #00ffc8;
+            padding: 6px 18px;
+            border-radius: 40px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: 0.2s;
+        }
+        .token-area .save-token:hover {
+            background: rgba(0,255,200,0.15);
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 700px) {
+            .dashboard { padding: 24px 18px; }
+            .header { flex-direction: column; align-items: flex-start; }
+            .brand h1 { font-size: 22px; }
+            .btn-run { width: 100%; justify-content: center; padding: 18px 30px; font-size: 18px; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .report-item { flex-direction: column; align-items: flex-start; }
+        }
+        @media (max-width: 450px) {
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+
+    <!-- ===== HEADER ===== -->
+    <div class="header">
+        <div class="brand">
+            <i class="fas fa-skull"></i>
+            <h1>haidar7900</h1>
+            <span>v3.0 · Ultimate</span>
+        </div>
+        <div class="status-badge">
+            <div class="dot idle" id="statusDot"></div>
+            <span class="label" id="statusLabel">جاهز</span>
+            <span class="time" id="statusTime">—</span>
+        </div>
+    </div>
+
+    <!-- ===== TOKEN (لتشغيل GitHub Actions) ===== -->
+    <div class="token-area">
+        <label><i class="fas fa-key"></i> GitHub Token</label>
+        <input type="password" id="githubToken" placeholder="ghp_xxxx... (للتحكم بالـ Actions)">
+        <button class="save-token" onclick="saveToken()"><i class="fas fa-check"></i> حفظ</button>
+        <span style="color:#495670;font-size:12px;">يُخزن محلياً في متصفحك</span>
+    </div>
+
+    <!-- ===== STATS ===== -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="number" id="statTargets">0</div>
+            <div class="desc"><i class="fas fa-bullseye"></i> الأهداف</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" id="statRuns">0</div>
+            <div class="desc"><i class="fas fa-play"></i> عمليات التشغيل</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" id="statVulns">0</div>
+            <div class="desc"><i class="fas fa-bug"></i> ثغرات مكتشفة</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" id="statLastRun">—</div>
+            <div class="desc"><i class="fas fa-clock"></i> آخر تشغيل</div>
+        </div>
+    </div>
+
+    <!-- ===== ACTION BUTTON ===== -->
+    <div class="action-area">
+        <button class="btn-run" id="runBtn" onclick="triggerWorkflow()">
+            <i class="fas fa-rocket"></i>
+            <span>تشغيل الفحص الكامل</span>
+            <span class="badge-trigger">All Tools</span>
+        </button>
+        <div class="status-msg" id="statusMsg">
+            <i class="fas fa-circle-info"></i>
+            اضغط الزر لبدء الفحص على جميع الأهداف
+        </div>
+    </div>
+
+    <!-- ===== REPORTS ===== -->
+    <div class="reports-section">
+        <h3><i class="fas fa-file-alt"></i> آخر التقارير</h3>
+        <div class="report-list" id="reportList">
+            <div style="color:#495670;padding:12px;text-align:center;width:100%;">
+                <i class="fas fa-spinner fa-pulse"></i> جاري التحميل...
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== FOOTER ===== -->
+    <div class="footer">
+        <span>© 2026 <a href="https://github.com/haidar7900" target="_blank">haidar7900</a> · Bug Bounty Automation</span>
+        <span>
+            <i class="fas fa-shield-alt"></i> 
+            <a href="https://github.com/haidar7900/bugbounty-automation" target="_blank">GitHub Repo</a>
+        </span>
+    </div>
+</div>
+
+<script>
+    // =========================================
+    //  CONFIG
+    // =========================================
+    const REPO_OWNER = 'haidar7900';
+    const REPO_NAME  = 'bugbounty-automation';
+    const WORKFLOW_ID = 'auto-hunt.yml';  // اسم الملف
+
+    // =========================================
+    //  STATE
+    // =========================================
+    let currentRunId = null;
+    let pollInterval = null;
+    let token = localStorage.getItem('gh_token') || '';
+
+    // =========================================
+    //  DOM REFS
+    // =========================================
+    const dot = document.getElementById('statusDot');
+    const label = document.getElementById('statusLabel');
+    const statusTime = document.getElementById('statusTime');
+    const statusMsg = document.getElementById('statusMsg');
+    const runBtn = document.getElementById('runBtn');
+    const tokenInput = document.getElementById('githubToken');
+    const reportList = document.getElementById('reportList');
+
+    // =========================================
+    //  INIT
+    // =========================================
+    if (token) tokenInput.value = token;
+    loadStats();
+    loadReports();
+
+    // =========================================
+    //  TOKEN
+    // =========================================
+    function saveToken() {
+        const t = tokenInput.value.trim();
+        if (t) {
+            localStorage.setItem('gh_token', t);
+            token = t;
+            statusMsg.innerHTML = '<i class="fas fa-check-circle" style="color:#4ade80;"></i> تم حفظ التوكن بنجاح';
+            setTimeout(() => { statusMsg.innerHTML = '<i class="fas fa-circle-info"></i> جاهز لتشغيل الفحص'; }, 2500);
+        } else {
+            localStorage.removeItem('gh_token');
+            token = '';
+            statusMsg.innerHTML = '<i class="fas fa-triangle-exclamation" style="color:#facc15;"></i> تم حذف التوكن';
+        }
+    }
+
+    // =========================================
+    //  TRIGGER WORKFLOW
+    // =========================================
+    async function triggerWorkflow() {
+        if (!token) {
+            statusMsg.innerHTML = '<i class="fas fa-times-circle" style="color:#ef4444;"></i> الرجاء إدخال GitHub Token أولاً';
+            return;
+        }
+
+        runBtn.disabled = true;
+        setStatus('running', 'جارٍ التشغيل...');
+
+        try {
+            const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_ID}/dispatches`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                },
+                body: JSON.stringify({ ref: 'main' })
+            });
+
+            if (res.status === 204) {
+                statusMsg.innerHTML = '<i class="fas fa-check-circle" style="color:#4ade80;"></i> ✅ تم تشغيل الفحص بنجاح! انتظر النتائج...';
+                setStatus('running', 'قيد التشغيل...');
+                // نبحث عن آخر run
+                setTimeout(() => { pollLatestRun(); }, 5000);
+            } else {
+                const err = await res.text();
+                throw new Error(`HTTP ${res.status}: ${err}`);
+            }
+        } catch (e) {
+            statusMsg.innerHTML = `<i class="fas fa-times-circle" style="color:#ef4444;"></i> خطأ: ${e.message}`;
+            setStatus('idle', 'فشل');
+        } finally {
+            runBtn.disabled = false;
+        }
+    }
+
+    // =========================================
+    //  POLL LATEST RUN
+    // =========================================
+    async function pollLatestRun() {
+        if (!token) return;
+        try {
+            const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs?per_page=1`, {
+                headers: { 'Authorization': `token ${token}` }
+            });
+            const data = await res.json();
+            if (data.workflow_runs && data.workflow_runs.length > 0) {
+                const run = data.workflow_runs[0];
+                currentRunId = run.id;
+                if (run.status === 'completed') {
+                    updateRunStatus(run);
+                } else {
+                    setStatus('running', 'جاري التنفيذ...');
+                    statusTime.textContent = new Date(run.created_at).toLocaleTimeString();
+                    // نتابع
+                    if (pollInterval) clearInterval(pollInterval);
+                    pollInterval = setInterval(() => { pollRunStatus(); }, 7000);
+                }
+            }
+        } catch (e) { console.warn('pollLatestRun error', e); }
+    }
+
+    async function pollRunStatus() {
+        if (!currentRunId || !token) return;
+        try {
+            const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs/${currentRunId}`, {
+                headers: { 'Authorization': `token ${token}` }
+            });
+            const run = await res.json();
+            if (run.status === 'completed') {
+                clearInterval(pollInterval);
+                pollInterval = null;
+                updateRunStatus(run);
+                loadReports();
+                loadStats();
+            } else {
+                setStatus('running', 'جاري التنفيذ...');
+                statusTime.textContent = new Date(run.updated_at).toLocaleTimeString();
+            }
+        } catch (e) { console.warn('pollRunStatus error', e); }
+    }
+
+    function updateRunStatus(run) {
+        const conclusion = run.conclusion || 'success';
+        if (conclusion === 'success') {
+            setStatus('success', '✅ نجاح');
+            statusMsg.innerHTML = '<i class="fas fa-check-circle" style="color:#4ade80;"></i> الفحص اكتمل بنجاح! حمل التقرير من الأسفل.';
+        } else if (conclusion === 'failure') {
+            setStatus('failed', '❌ فشل');
+            statusMsg.innerHTML = '<i class="fas fa-times-circle" style="color:#ef4444;"></i> الفحص فشل، راجع السجلات.';
+        } else {
+            setStatus('idle', 'جاهز');
+        }
+        statusTime.textContent = new Date(run.updated_at).toLocaleTimeString();
+        document.getElementById('statLastRun').textContent = new Date(run.updated_at).toLocaleString();
+        loadReports();
+    }
+
+    // =========================================
+    //  SET STATUS
+    // =========================================
+    function setStatus(type, text) {
+        dot.className = 'dot ' + type;
+        label.textContent = text;
+    }
+
+    // =========================================
+    //  LOAD STATS
+    // =========================================
+    async function loadStats() {
+        try {
+            // عدد الأهداف من ملف targets.txt (عبر raw)
+            const tRes = await fetch('https://raw.githubusercontent.com/haIdar7900/bugbounty-automation/main/config/targets.txt');
+            const tText = await tRes.text();
+            const lines = tText.split('\n').filter(l => l.trim());
+            document.getElementById('statTargets').textContent = lines.length || 0;
+
+            // عدد التشغيلات
+            if (token) {
+                const runsRes = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs?per_page=1`, {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+                const runsData = await runsRes.json();
+                if (runsData.total_count !== undefined) {
+                    document.getElementById('statRuns').textContent = runsData.total_count;
+                }
+                // آخر تشغيل
+                if (runsData.workflow_runs && runsData.workflow_runs.length > 0) {
+                    const last = runsData.workflow_runs[0];
+                    document.getElementById('statLastRun').textContent = new Date(last.updated_at).toLocaleString();
+                    if (last.status === 'completed') updateRunStatus(last);
+                }
+            }
+        } catch (e) { console.warn('loadStats error', e); }
+    }
+
+    // =========================================
+    //  LOAD REPORTS (Artifacts)
+    // =========================================
+    async function loadReports() {
+        if (!token) {
+            reportList.innerHTML = `<div style="color:#495670;padding:12px;text-align:center;"><i class="fas fa-lock"></i> أدخل التوكن لعرض التقارير</div>`;
+            return;
+        }
+        try {
+            const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/artifacts?per_page=10`, {
+                headers: { 'Authorization': `token ${token}` }
+            });
+            const data = await res.json();
+            if (!data.artifacts || data.artifacts.length === 0) {
+                reportList.innerHTML = `<div style="color:#495670;padding:12px;text-align:center;">لا توجد تقارير بعد</div>`;
+                return;
+            }
+            let html = '';
+            data.artifacts.forEach(a => {
+                const date = new Date(a.created_at).toLocaleString();
+                html += `
+                    <div class="report-item">
+                        <div class="info">
+                            <i class="fas fa-file-archive"></i>
+                            <span class="name">${a.name}</span>
+                            <span class="date">${date}</span>
+                            <span style="font-size:12px;color:#495670;">${(a.size_in_bytes / 1024).toFixed(1)} KB</span>
+                        </div>
+                        <a href="${a.archive_download_url}" class="download-btn" target="_blank">
+                            <i class="fas fa-download"></i> تحميل
+                        </a>
+                    </div>
+                `;
+            });
+            reportList.innerHTML = html;
+        } catch (e) {
+            reportList.innerHTML = `<div style="color:#ef4444;padding:12px;">خطأ في تحميل التقارير</div>`;
+            console.warn('loadReports error', e);
+        }
+    }
+
+    // =========================================
+    //  AUTO REFRESH كل 30 ثانية
+    // =========================================
+    setInterval(() => {
+        loadStats();
+        if (currentRunId) pollRunStatus();
+    }, 30000);
+
+</script>
+</body>
+</html>
