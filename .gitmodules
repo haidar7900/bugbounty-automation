@@ -4,3 +4,6 @@
 [submodule "tools/hawkeye"]
   path = tools/hawkeye
   url = https://github.com/Btr4k/bugbounty-agent.git
+[submodule "tools/BBOT"]
+	path = tools/BBOT
+	url = https://github.com/blacklanternsecurity/bbot.git

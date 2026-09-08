@@ -1,59 +1,58 @@
-name: 🤖 ULTIMATE Bug Bounty (Parallel)
+name: 🤖 Exploitation & Bypass Pipeline
 
 on:
-  schedule:
-    - cron: '0 */6 * * *'
   workflow_dispatch:
+  schedule:
+    - cron: '0 */4 * * *'
 
 jobs:
-  prepare:
+  exploit:
     runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.split.outputs.matrix }}
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
-      - name: 🔍 Fetch Public Targets
-        run: |
-          curl -s https://raw.githubusercontent.com/arkadiyt/bounty-targets-data/main/data/domains.txt | head -500 > config/targets.txt
-          echo "✅ Found $(wc -l < config/targets.txt) targets"
-      - name: 📦 Split into chunks
-        id: split
-        run: |
-          mkdir -p chunks
-          split -l 30 config/targets.txt chunks/chunk_
-          echo "matrix=$(ls chunks/chunk_* | jq -R -s -c 'split("\n")[:-1]')" >> $GITHUB_OUTPUT
 
-  hunt:
-    needs: prepare
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix:
-        chunk: ${{ fromJson(needs.prepare.outputs.matrix) }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install core tools
+      - name: Install Attack Tools
         run: |
-          sudo apt update
-          sudo apt install -y git golang-go python3-pip jq
-          go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-          go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
-          go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-          pip install aiptx riftor
+          chmod +x setup.sh
+          ./setup.sh
           echo "export PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
-      - name: 🔥 Scan chunk
+
+      - name: 🎯 Phase 1: Path Discovery (FFUF + Dirsearch)
         run: |
           mkdir -p reports
           while read target; do
-            [ -z "$target" ] && continue
-            echo "🔥 Scanning $target"
-            subfinder -d "$target" -silent -o "reports/sub_$target.txt" || true
-            httpx -l "reports/sub_$target.txt" -silent -o "reports/alive_$target.txt" || true
-            nuclei -l "reports/alive_$target.txt" -severity low,medium,high,critical -o "reports/nuclei_$target.txt" || true
-          done < "${{ matrix.chunk }}"
-      - name: 📤 Upload reports
+            echo "🔍 Fuzzing paths on $target..."
+            ffuf -u https://$target/FUZZ -w /usr/share/wordlists/dirb/common.txt -ac -o reports/paths_${target}.json || true
+            dirsearch -u https://$target -e php,html,js,bak,txt,json -o reports/dirsearch_${target}.txt || true
+          done < config/targets.txt
+
+      - name: 🚧 Phase 2: WAF Bypass & XSS (XSSHunt + Dalfox)
+        run: |
+          while read target; do
+            echo "🛡️ Bypassing WAF on $target..."
+            xsshunt -u https://$target --bypass -o reports/waf_bypass_${target}.txt || true
+            dalfox url https://$target --waf-evasion -o reports/dalfox_${target}.txt || true
+          done < config/targets.txt
+
+      - name: ⚡ Phase 3: Command Injection (Commix)
+        run: |
+          while read target; do
+            echo "💥 Testing RCE on $target..."
+            python tools/commix/commix.py --url https://$target --batch --output-dir reports/commix_${target} || true
+          done < config/targets.txt
+
+      - name: 🧠 Phase 4: AI Exploitation (Strix + Nuclei Exploits)
+        run: |
+          while read target; do
+            echo "🤖 Generating PoC for $target..."
+            strix --target $target --output reports/strix_poc_${target}.json || true
+            # تشغيل قوالب الاستغلال فقط (بدون القوالب العادية)
+            nuclei -u https://$target -tags exploit,waf-bypass -o reports/nuclei_exploits_${target}.txt || true
+          done < config/targets.txt
+
+      - name: 📤 Upload Exploit Reports
         uses: actions/upload-artifact@v4
         with:
-          name: chunk-reports-${{ strategy.job-index }}
+          name: Exploit-Reports
           path: reports/
