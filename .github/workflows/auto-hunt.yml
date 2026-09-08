@@ -1,4 +1,4 @@
-name: 🤖 Exploitation & Bypass Pipeline
+name: 🤖 ULTIMATE Exploitation & Bypass
 
 on:
   workflow_dispatch:
@@ -6,53 +6,93 @@ on:
     - cron: '0 */4 * * *'
 
 jobs:
-  exploit:
+  hunt:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Attack Tools
+      - name: Install ALL Tools
         run: |
           chmod +x setup.sh
           ./setup.sh
-          echo "export PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
+          echo "export PATH=$PATH:$(go env GOPATH)/bin:/usr/local/bin" >> $GITHUB_ENV
 
-      - name: 🎯 Phase 1: Path Discovery (FFUF + Dirsearch)
+      - name: 🎯 Full Attack Pipeline
         run: |
-          mkdir -p reports
+          mkdir -p reports logs
+          
+          # دالة لتشغيل الأوامر مع تجاوز الأخطاء
+          run_safe() {
+            echo "[*] Running: $1"
+            timeout 300 bash -c "$1" 2>&1 | tee -a logs/errors.log || {
+              echo "[!] Command failed: $1 (continuing...)"
+            }
+          }
+          
+          # التأكد من وجود أهداف
+          if [ ! -s config/targets.txt ]; then
+            echo "example.com" > config/targets.txt
+          fi
+          
           while read target; do
-            echo "🔍 Fuzzing paths on $target..."
-            ffuf -u https://$target/FUZZ -w /usr/share/wordlists/dirb/common.txt -ac -o reports/paths_${target}.json || true
-            dirsearch -u https://$target -e php,html,js,bak,txt,json -o reports/dirsearch_${target}.txt || true
+            [ -z "$target" ] && continue
+            echo "========================================"
+            echo "🎯 TARGET: $target"
+            echo "========================================"
+            
+            # ----- 1. RECON (استطلاع كامل) -----
+            echo "[1/6] RECON..."
+            run_safe "subfinder -d $target -silent -o reports/sub_${target}.txt"
+            run_safe "amass enum -d $target -o reports/amass_${target}.txt"
+            run_safe "assetfinder -subs-only $target > reports/asset_${target}.txt"
+            cat reports/sub_${target}.txt reports/amass_${target}.txt reports/asset_${target}.txt > reports/all_${target}.txt
+            sort -u reports/all_${target}.txt -o reports/all_${target}.txt
+            
+            # ----- 2. ALIVE HOSTS -----
+            echo "[2/6] ALIVE HOSTS..."
+            run_safe "httpx -l reports/all_${target}.txt -silent -o reports/alive_${target}.txt"
+            
+            # ----- 3. PATH DISCOVERY (FFUF + Dirsearch) -----
+            echo "[3/6] PATH DISCOVERY..."
+            run_safe "ffuf -u https://$target/FUZZ -w /usr/share/wordlists/dirb/common.txt -ac -o reports/ffuf_${target}.json"
+            run_safe "python tools/dirsearch/dirsearch.py -u https://$target -e php,html,js,bak,txt -o reports/dirsearch_${target}.txt"
+            
+            # ----- 4. XSS & WAF BYPASS (Dalfox + XSSHunt) -----
+            echo "[4/6] XSS & WAF BYPASS..."
+            run_safe "dalfox url https://$target --waf-evasion -o reports/dalfox_${target}.txt"
+            run_safe "xsshunt -u https://$target --bypass -o reports/xsshunt_${target}.txt"
+            
+            # ----- 5. EXPLOITATION (Commix + Strix) -----
+            echo "[5/6] EXPLOITATION (RCE + PoC)..."
+            run_safe "commix --url https://$target --batch --output-dir reports/commix_${target}"
+            run_safe "strix --target $target --output reports/strix_${target}.json"
+            
+            # ----- 6. NUCLEI (جميع الثغرات مع قوالب الاستغلال) -----
+            echo "[6/6] NUCLEI (All CVEs + Exploits)..."
+            run_safe "nuclei -l reports/alive_${target}.txt -severity low,medium,high,critical -o reports/nuclei_${target}.txt"
+            run_safe "nuclei -l reports/alive_${target}.txt -tags exploit,waf-bypass -o reports/nuclei_exploits_${target}.txt"
+            
+            # ----- FINAL REPORT SUMMARY -----
+            echo "## 🎯 Target: $target" >> reports/FINAL.md
+            echo "" >> reports/FINAL.md
+            echo "### 🔍 Subdomains Found: $(wc -l < reports/all_${target}.txt)" >> reports/FINAL.md
+            echo "### 🟢 Alive Hosts: $(wc -l < reports/alive_${target}.txt)" >> reports/FINAL.md
+            echo "### 📂 Paths Found: $(wc -l < reports/ffuf_${target}.json 2>/dev/null || echo 0)" >> reports/FINAL.md
+            echo "### 💥 XSS Findings: $(wc -l < reports/dalfox_${target}.txt 2>/dev/null || echo 0)" >> reports/FINAL.md
+            echo "### 🚨 Nuclei Vulnerabilities: $(wc -l < reports/nuclei_${target}.txt 2>/dev/null || echo 0)" >> reports/FINAL.md
+            echo "### ⚡ Exploitable Findings: $(wc -l < reports/nuclei_exploits_${target}.txt 2>/dev/null || echo 0)" >> reports/FINAL.md
+            echo "" >> reports/FINAL.md
+            echo "---" >> reports/FINAL.md
+            
           done < config/targets.txt
+          
+          echo "✅ Scan completed. Check reports/FINAL.md"
 
-      - name: 🚧 Phase 2: WAF Bypass & XSS (XSSHunt + Dalfox)
-        run: |
-          while read target; do
-            echo "🛡️ Bypassing WAF on $target..."
-            xsshunt -u https://$target --bypass -o reports/waf_bypass_${target}.txt || true
-            dalfox url https://$target --waf-evasion -o reports/dalfox_${target}.txt || true
-          done < config/targets.txt
-
-      - name: ⚡ Phase 3: Command Injection (Commix)
-        run: |
-          while read target; do
-            echo "💥 Testing RCE on $target..."
-            python tools/commix/commix.py --url https://$target --batch --output-dir reports/commix_${target} || true
-          done < config/targets.txt
-
-      - name: 🧠 Phase 4: AI Exploitation (Strix + Nuclei Exploits)
-        run: |
-          while read target; do
-            echo "🤖 Generating PoC for $target..."
-            strix --target $target --output reports/strix_poc_${target}.json || true
-            # تشغيل قوالب الاستغلال فقط (بدون القوالب العادية)
-            nuclei -u https://$target -tags exploit,waf-bypass -o reports/nuclei_exploits_${target}.txt || true
-          done < config/targets.txt
-
-      - name: 📤 Upload Exploit Reports
+      - name: 📤 Upload All Reports
         uses: actions/upload-artifact@v4
         with:
-          name: Exploit-Reports
-          path: reports/
+          name: Ultimate-Exploit-Reports
+          path: |
+            reports/
+            logs/
