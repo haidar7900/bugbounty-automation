@@ -1,91 +1,105 @@
 #!/bin/bash
-set +e
-echo "🔥 Installing ALL Advanced Bug Bounty Tools..."
+set -uo pipefail
+
+echo "Installing ALL Advanced Bug Bounty Tools..."
+
+run_step() {
+  echo "RUNNING: $1"
+  eval "$1" || echo "WARNING: step failed, continuing -> $1"
+}
+
+FAILED_TOOLS=()
+OK_TOOLS=()
+
+check_tool() {
+  if command -v "$1" &> /dev/null; then
+    OK_TOOLS+=("$1")
+  else
+    FAILED_TOOLS+=("$1")
+  fi
+}
+
+export PATH=$PATH:$(go env GOPATH 2>/dev/null)/bin:$HOME/go/bin:/usr/local/bin:$HOME/.cargo/bin
+mkdir -p "$(go env GOPATH 2>/dev/null || echo $HOME/go)/bin"
 
 sudo apt update -y
-sudo apt install -y git golang-go python3-pip jq nmap masscan curl wget unzip
+sudo apt install -y git golang-go python3-pip jq nmap masscan curl wget unzip ruby ruby-dev build-essential nodejs npm
 
-# ===== 1. الأدوات الأساسية (Go) =====
-echo "[1/8] Installing Core Go Tools..."
-go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest 2>/dev/null
-go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest 2>/dev/null
-go install -v github.com/projectdiscovery/katana/cmd/katana@latest 2>/dev/null
-go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest 2>/dev/null
-go install -v github.com/ffuf/ffuf/v2@latest 2>/dev/null
-go install -v github.com/tomnomnom/waybackurls@latest 2>/dev/null
-go install -v github.com/tomnomnom/assetfinder@latest 2>/dev/null
-go install -v github.com/tomnomnom/gf@latest 2>/dev/null
-go install -v github.com/OWASP/Amass/v3/...@master 2>/dev/null
-go install -v github.com/lc/gau/v2/cmd/gau@latest 2>/dev/null
-go install -v github.com/hahwul/dalfox/v2@latest 2>/dev/null
-go install -v github.com/Emoe/kxss@latest 2>/dev/null
-go install -v github.com/sw33tLie/bbscope@latest 2>/dev/null
+echo ""
+echo "=== [1/4] Installing Core Go Tools ==="
+go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+go install -v github.com/projectdiscovery/katana/cmd/katana@latest
+go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+go install -v github.com/ffuf/ffuf/v2@latest
+go install -v github.com/tomnomnom/waybackurls@latest
+go install -v github.com/tomnomnom/assetfinder@latest
+go install -v github.com/tomnomnom/gf@latest
+go install -v github.com/owasp-amass/amass/v4/...@master
+go install -v github.com/lc/gau/v2/cmd/gau@latest
+go install -v github.com/hahwul/dalfox/v2@latest
+go install -v github.com/Emoe/kxss@latest
 
-# ===== 2. أدوات Python =====
-echo "[2/8] Installing Python Tools..."
-pip install --upgrade pip 2>/dev/null
-pip install aiptx riftor bbot truffleHog dirsearch 2>/dev/null
-pip install git+https://github.com/maverickaayush/ONUS.git 2>/dev/null
-pip install git+https://github.com/ItAkIlA/recon_osint.git 2>/dev/null
+for t in subfinder httpx katana nuclei ffuf waybackurls assetfinder gf amass gau dalfox kxss; do
+  check_tool "$t"
+done
 
-# ===== 3. Pinakastra (AI Exploitation) =====
-echo "[3/8] Installing Pinakastra..."
-cd tools/Pinakastra && pip install -r requirements.txt 2>/dev/null
-cd ../..
+echo ""
+echo "=== [2/4] Installing Python Base Tools ==="
+pip install --upgrade pip --break-system-packages
+run_step "pip install --break-system-packages bbot"
+run_step "curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin"
 
-# ===== 4. ParamSpecter-Crawler =====
-echo "[4/8] Installing ParamSpecter-Crawler..."
-cd tools/ParamSpecter-Crawler && pip install -r requirements.txt 2>/dev/null
-cd ../..
+echo ""
+echo "=== [3/4] Auto-installing all tools/ submodules (generic detection) ==="
 
-# ===== 5. AIRecon =====
-echo "[5/8] Installing AIRecon..."
-cd tools/AIRecon && pip install -r requirements.txt 2>/dev/null
-cd ../..
+for dir in tools/*/; do
+  name=$(basename "$dir")
+  echo "--- $name ---"
 
-# ===== 6. BugHawk AI =====
-echo "[6/8] Installing BugHawk AI..."
-cd tools/BugHawk-AI && pip install -r requirements.txt 2>/dev/null
-cd ../..
+  if [ -f "${dir}requirements.txt" ]; then
+    run_step "pip install --break-system-packages -r '${dir}requirements.txt'"
+  fi
 
-# ===== 7. DetectiveJoe =====
-echo "[7/8] Installing DetectiveJoe..."
-cd tools/DetectiveJoe && chmod +x install.sh && ./install.sh 2>/dev/null
-cd ../..
+  if [ -f "${dir}package.json" ]; then
+    run_step "(cd '$dir' && npm install)"
+  fi
 
-# ===== 8. ReconSuite-AI =====
-echo "[8/8] Installing ReconSuite-AI..."
-cd tools/ReconSuite-AI && pip install -r requirements.txt 2>/dev/null
-cd ../..
+  if [ -f "${dir}Gemfile" ]; then
+    run_step "(cd '$dir' && bundle install)"
+  elif [ "$name" = "ronin" ]; then
+    run_step "gem install ronin-rb"
+  fi
 
-# ===== 9. NoSQLMap =====
-echo "[9/9] Installing NoSQLMap..."
-cd tools/NoSQLMap && pip install -r requirements.txt 2>/dev/null
-cd ../..
+  if [ -f "${dir}install.sh" ]; then
+    run_step "(cd '$dir' && chmod +x install.sh && ./install.sh)"
+  fi
 
-# ===== 10. HexStrike AI =====
-echo "[10/10] Installing HexStrike AI..."
-cd tools/HexStrike-AI && pip install -r requirements.txt 2>/dev/null
-cd ../..
+  if [ -f "${dir}setup.py" ]; then
+    run_step "pip install --break-system-packages -e '$dir'"
+  fi
 
-# ===== 11. advanced-bugbounty-mcp =====
-echo "[11/11] Installing advanced-bugbounty-mcp..."
-cd tools/advanced-bugbounty-mcp && pip install -r requirements.txt 2>/dev/null
-cd ../..
+  if [ -f "${dir}go.mod" ]; then
+    echo "NOTE: $name is a Go module - build manually if needed: (cd $dir && go build ./...)"
+  fi
 
-# ===== تحديث قوالب Nuclei =====
-nuclei -update-templates -silent 2>/dev/null
+  echo ""
+done
 
-# ===== ضبط المسار =====
-echo "export PATH=$PATH:$(go env GOPATH)/bin:/usr/local/bin" >> $GITHUB_ENV
+echo ""
+echo "=== [4/4] Updating Nuclei templates ==="
+run_step "nuclei -update-templates -silent"
 
-echo "✅ ALL tools installed successfully!"
-
-# ===== chrome-agent (التفاعل مع Chrome) =====
-echo "[12/12] Installing chrome-agent..."
-# تثبيت الأداة عبر uv (موصى به) أو pip
-if command -v uv &> /dev/null; then
-    uv tool install chrome-agent
-else
-    pip install chrome-agent
+if ! grep -q "go env GOPATH" "$HOME/.bashrc" 2>/dev/null; then
+  echo 'export PATH=$PATH:$(go env GOPATH)/bin:$HOME/.cargo/bin' >> "$HOME/.bashrc"
 fi
+if [ -n "${GITHUB_ENV:-}" ]; then
+  echo "PATH=$PATH" >> "$GITHUB_ENV"
+fi
+
+echo ""
+echo "=== INSTALL SUMMARY ==="
+echo "OK: ${OK_TOOLS[*]:-none}"
+echo "MISSING (check manually): ${FAILED_TOOLS[*]:-none}"
+echo ""
+echo "Setup finished."
