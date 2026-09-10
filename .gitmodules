@@ -43,3 +43,55 @@
 [submodule "tools/advanced-bugbounty-mcp"]
 	path = tools/advanced-bugbounty-mcp
 	url = https://github.com/0xN1x0/advanced-bugbounty-mcp.git
+
+[submodule "tools/chrome-agent"]
+	path = tools/chrome-agent
+	url = https://github.com/captivus/chrome-agent.git
+[submodule "tools/bbscope"]
+	path = tools/bbscope
+	url = https://github.com/sw33tLie/bbscope.git
+[submodule "tools/BugTraceAI-CLI"]
+	path = tools/BugTraceAI-CLI
+	url = https://github.com/BugTraceAI/BugTraceAI-CLI.git
+[submodule "tools/Pentest-Agents"]
+	path = tools/Pentest-Agents
+	url = https://github.com/H-mmer/pentest-agents.git
+[submodule "tools/all-in-one-recon"]
+	path = tools/all-in-one-recon
+	url = https://github.com/PradyumnTiwareNexus/All-in-one-recon.git
+[submodule "tools/alnur"]
+	path = tools/alnur
+	url = https://github.com/Threads-Beams/ALNUR.git
+[submodule "tools/ars0n"]
+	path = tools/ars0n
+	url = https://github.com/R-s0n/ars0n-framework-v2.git
+[submodule "tools/bb-toolkit"]
+	path = tools/bb-toolkit
+	url = https://github.com/0xpynge/bug-bounty-toolkit.git
+[submodule "tools/bugbounty-mcp"]
+	path = tools/bugbounty-mcp
+	url = https://github.com/gokulapap/bugbounty-mcp-server.git
+[submodule "tools/magicrecon"]
+	path = tools/magicrecon
+	url = https://github.com/robotshell/magicRecon.git
+[submodule "tools/reconaizer"]
+	path = tools/reconaizer
+	url = https://github.com/slehee/ReconAIzer.git
+[submodule "tools/reconbud"]
+	path = tools/reconbud
+	url = https://github.com/tallaladnan/ReconBud.git
+[submodule "tools/ronin"]
+	path = tools/ronin
+	url = https://github.com/ronin-rb/ronin.git
+[submodule "tools/vulneramcp"]
+	path = tools/vulneramcp
+	url = https://github.com/telmon95/vulneramcp.git
+[submodule "tools/vulscanner"]
+	path = tools/vulscanner
+	url = https://github.com/zeemscript/vulscanner.git
+[submodule "tools/webvulnscan"]
+	path = tools/webvulnscan
+	url = https://github.com/ManishPanchal0199/Web-Application-Vulnerability-Scanner.git
+[submodule "tools/wp-hunter-mcp"]
+	path = tools/wp-hunter-mcp
+	url = https://github.com/RaheesAhmed/wp-hunter-mcp.git

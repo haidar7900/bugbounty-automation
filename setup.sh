@@ -80,3 +80,12 @@ nuclei -update-templates -silent 2>/dev/null
 echo "export PATH=$PATH:$(go env GOPATH)/bin:/usr/local/bin" >> $GITHUB_ENV
 
 echo "✅ ALL tools installed successfully!"
+
+# ===== chrome-agent (التفاعل مع Chrome) =====
+echo "[12/12] Installing chrome-agent..."
+# تثبيت الأداة عبر uv (موصى به) أو pip
+if command -v uv &> /dev/null; then
+    uv tool install chrome-agent
+else
+    pip install chrome-agent
+fi
