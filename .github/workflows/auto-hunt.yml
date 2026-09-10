@@ -1,107 +1,134 @@
-name: 🤖 ULTIMATE Bug Bounty (All Advanced Tools)
+name: Auto Bug Bounty Hunt
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '0 */4 * * *'
+    - cron: '0 */6 * * *'   # كل 6 ساعات
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Single target domain'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
 
 jobs:
   hunt:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 120
+
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install ALL Tools
-        run: |
-          chmod +x setup.sh
-          ./setup.sh
-          echo "export PATH=$PATH:$(go env GOPATH)/bin:/usr/local/bin" >> $GITHUB_ENV
-
-      - name: 🚀 Advanced Scan Pipeline
-        run: |
-          mkdir -p reports logs
-          
-          run_safe() {
-            echo "[*] Running: $1"
-            timeout 600 bash -c "$1" 2>&1 | tee -a logs/errors.log || {
-              echo "[!] Command failed: $1 (continuing...)"
-            }
-          }
-          
-          if [ ! -s config/targets.txt ]; then
-            echo "example.com" > config/targets.txt
-          fi
-          
-          while read target; do
-            [ -z "$target" ] && continue
-            echo "========================================"
-            echo "🎯 TARGET: $target"
-            echo "========================================"
-            
-            # ----- 1. RECON (Core + AIRecon + DetectiveJoe + ReconSuite) -----
-            echo "[1/9] RECON (AIRecon + DetectiveJoe + ReconSuite)..." >> reports/FINAL.md
-            run_safe "subfinder -d $target -silent -o reports/sub_${target}.txt"
-            run_safe "amass enum -d $target -o reports/amass_${target}.txt"
-            run_safe "assetfinder -subs-only $target > reports/asset_${target}.txt"
-            run_safe "python tools/AIRecon/airecon.py -t $target -o reports/airecon_${target}.json"
-            run_safe "python tools/DetectiveJoe/detectivejoe.py -d $target -o reports/joe_${target}.json"
-            run_safe "python tools/ReconSuite-AI/reconsuite.py -d $target -o reports/reconsuite_${target}.json"
-            cat reports/sub_${target}.txt reports/amass_${target}.txt reports/asset_${target}.txt > reports/all_${target}.txt
-            sort -u reports/all_${target}.txt -o reports/all_${target}.txt
-            
-            # ----- 2. ALIVE HOSTS -----
-            echo "[2/9] ALIVE HOSTS..." >> reports/FINAL.md
-            run_safe "httpx -l reports/all_${target}.txt -silent -o reports/alive_${target}.txt"
-            
-            # ----- 3. PARAM SPECTER (كشف المعاملات المخفية) -----
-            echo "[3/9] PARAM SPECTER..." >> reports/FINAL.md
-            run_safe "python tools/ParamSpecter-Crawler/paramspecter.py -u https://$target -o reports/params_${target}.json"
-            
-            # ----- 4. AI EXPLOITATION (Pinakastra) -----
-            echo "[4/9] AI EXPLOITATION (Pinakastra)..." >> reports/FINAL.md
-            run_safe "python tools/Pinakastra/pinakastra.py -d $target -o reports/pinakastra_${target}.json"
-            
-            # ----- 5. XSS & WAF BYPASS -----
-            echo "[5/9] XSS & WAF BYPASS..." >> reports/FINAL.md
-            run_safe "dalfox url https://$target --waf-evasion -o reports/dalfox_${target}.txt"
-            run_safe "kxss -i reports/urls_${target}.txt > reports/kxss_${target}.txt"
-            
-            # ----- 6. NoSQL INJECTION (NoSQLMap) -----
-            echo "[6/9] NoSQL INJECTION..." >> reports/FINAL.md
-            run_safe "python tools/NoSQLMap/nosqlmap.py --url https://$target --output reports/nosql_${target}.json"
-            
-            # ----- 7. AI BUG HUNT (BugHawk) -----
-            echo "[7/9] AI BUG HUNT (BugHawk)..." >> reports/FINAL.md
-            run_safe "python tools/BugHawk-AI/bughawk.py -t $target -o reports/bughawk_${target}.json"
-            
-            # ----- 8. NUCLEI (جميع الثغرات) -----
-            echo "[8/9] NUCLEI (All CVEs + Exploits)..." >> reports/FINAL.md
-            run_safe "nuclei -l reports/alive_${target}.txt -severity low,medium,high,critical -o reports/nuclei_${target}.txt"
-            run_safe "nuclei -l reports/alive_${target}.txt -tags exploit,waf-bypass -o reports/nuclei_exploits_${target}.txt"
-            
-            # ----- 9. FINAL SUMMARY -----
-            echo "[9/9] FINAL SUMMARY..." >> reports/FINAL.md
-            echo "## 🎯 Target: $target" >> reports/FINAL.md
-            echo "" >> reports/FINAL.md
-            echo "### 📊 Statistics" >> reports/FINAL.md
-            echo "- Subdomains: $(wc -l < reports/all_${target}.txt)" >> reports/FINAL.md
-            echo "- Alive Hosts: $(wc -l < reports/alive_${target}.txt)" >> reports/FINAL.md
-            echo "- Parameters Found: $(cat reports/params_${target}.json | jq '.params | length' 2>/dev/null || echo 0)" >> reports/FINAL.md
-            echo "- Pinakastra Exploits: $(cat reports/pinakastra_${target}.json | jq '.exploits | length' 2>/dev/null || echo 0)" >> reports/FINAL.md
-            echo "- NoSQL Findings: $(cat reports/nosql_${target}.json | jq '.findings | length' 2>/dev/null || echo 0)" >> reports/FINAL.md
-            echo "- Nuclei Vulnerabilities: $(wc -l < reports/nuclei_${target}.txt 2>/dev/null || echo 0)" >> reports/FINAL.md
-            echo "" >> reports/FINAL.md
-            echo "---" >> reports/FINAL.md
-            
-          done < config/targets.txt
-          
-          echo "✅ Scan completed."
-
-      - name: 📤 Upload Reports
-        uses: actions/upload-artifact@v4
+      # ⚠️ الأهم: submodules: recursive — بدونها tools/ تطلع فاضية
+      - name: Checkout with submodules
+        uses: actions/checkout@v4
         with:
-          name: Ultimate-Advanced-Reports
+          submodules: recursive
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify submodules populated
+        run: |
+          echo "Submodule count: $(git submodule status | wc -l)"
+          ls -la tools/ | head -40
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node (لـ MCP tools)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
           path: |
-            reports/
-            logs/
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
+
+      - name: Install core tools (PATH first)
+        run: |
+          export PATH="$PATH:$(go env GOPATH)/bin:$HOME/.local/bin"
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+          go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+          go install github.com/projectdiscovery/httpx/cmd/httpx@latest
+          go install github.com/projectdiscovery/katana/cmd/katana@latest
+          go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+          go install github.com/ffuf/ffuf/v2@latest
+          go install github.com/tomnomnom/waybackurls@latest
+          go install github.com/tomnomnom/assetfinder@latest
+          go install github.com/lc/gau/v2/cmd/gau@latest
+          go install github.com/hahwul/dalfox/v2@latest
+
+          nuclei -update-templates -silent || true
+
+      - name: Run setup.sh (installs tools/ submodules)
+        run: |
+          export PATH="$PATH:$(go env GOPATH)/bin:$HOME/.local/bin"
+          bash setup.sh
+        continue-on-error: true
+
+      - name: Verify critical tools available
+        run: |
+          export PATH="$PATH:$(go env GOPATH)/bin:$HOME/.local/bin"
+          for t in subfinder httpx katana nuclei ffuf gau dalfox; do
+            if command -v $t >/dev/null 2>&1; then
+              echo "OK: $t"
+            else
+              echo "MISSING: $t"
+            fi
+          done
+
+      - name: Prepare targets
+        run: |
+          mkdir -p output
+          if [ -n "${{ github.event.inputs.target }}" ]; then
+            echo "${{ github.event.inputs.target }}" > targets.txt
+          elif [ -f targets.txt ]; then
+            echo "Using existing targets.txt"
+          else
+            echo "example.com" > targets.txt
+          fi
+          cat targets.txt
+
+      - name: Run recon pipeline
+        run: |
+          export PATH="$PATH:$(go env GOPATH)/bin:$HOME/.local/bin"
+          while read -r domain; do
+            [ -z "$domain" ] && continue
+            echo "=== Hunting: $domain ==="
+            subfinder -d "$domain" -silent > output/subs.txt || true
+            httpx -l output/subs.txt -silent -o output/live.txt || true
+            nuclei -l output/live.txt -silent -o output/nuclei.txt || true
+          done < targets.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hunt-results-${{ github.run_number }}
+          path: output/
+          retention-days: 14
+
+      - name: Commit results
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p results
+          cp -r output/* results/ 2>/dev/null || true
+          git add results/ || true
+          git diff --staged --quiet || git commit -m "auto-hunt results [skip ci]"
+          git push || true
