@@ -100,7 +100,7 @@ jobs:
           elif [ -f targets.txt ]; then
             echo "Using existing targets.txt"
           else
-            echo "example.com" > targets.txt
+            echo "⚠️ No targets.txt and no input — aborting"; exit 1
           fi
           cat targets.txt
 
