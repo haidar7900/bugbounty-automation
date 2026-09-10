@@ -93,22 +93,29 @@ jobs:
           done
 
       - name: Prepare targets
+        env:
+          TARGETS_LIMIT: '50'
         run: |
           mkdir -p output
           if [ -n "${{ github.event.inputs.target }}" ]; then
-            echo "${{ github.event.inputs.target }}" > targets.txt
-          elif [ -f targets.txt ]; then
-            echo "Using existing targets.txt"
+            echo "${{ github.event.inputs.target }}" > output/targets_used.txt
+          elif [ -f config/targets_filtered.txt ]; then
+            echo "Using config/targets_filtered.txt (filtered list)"
+            head -n "$TARGETS_LIMIT" config/targets_filtered.txt > output/targets_used.txt
+          elif [ -f config/targets.txt ]; then
+            echo "Using config/targets.txt (sampled $TARGETS_LIMIT)"
+            head -n "$TARGETS_LIMIT" config/targets.txt > output/targets_used.txt
           else
-            echo "⚠️ No targets.txt and no input — aborting"; exit 1
+            echo "⚠️ No targets found in config/ and no input — aborting"; exit 1
           fi
-          cat targets.txt
+          echo "=== Targets this run ($(wc -l < output/targets_used.txt)) ==="
+          cat output/targets_used.txt
 
       - name: Run hunt pipeline
         run: |
           export PATH="$PATH:$(go env GOPATH)/bin:$HOME/.local/bin"
           chmod +x run_hunt.sh
-          ./run_hunt.sh targets.txt
+          ./run_hunt.sh output/targets_used.txt
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

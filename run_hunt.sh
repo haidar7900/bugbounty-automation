@@ -49,6 +49,7 @@ while read -r d; do
   if have amass; then
     timeout 120 amass enum -passive -d "$d" -silent 2>/dev/null >> "$OUTDIR/all_subs.txt" || true
   fi
+  sleep 3
 done < "$TARGETS_FILE"
 
 sort -u "$OUTDIR/all_subs.txt" -o "$OUTDIR/all_subs.txt"
@@ -61,7 +62,7 @@ log "=== [2/5] HTTP Probing ==="
 
 if have httpx; then
   httpx -l "$OUTDIR/all_subs.txt" \
-    -silent -threads "$THREADS" \
+    -silent -threads 20 -rate-limit 30 \
     -status-code -title -tech-detect -web-server \
     -o "$OUTDIR/live.txt" 2>/dev/null || true
   log "  ✅ live hosts: $(wc -l < "$OUTDIR/live.txt" 2>/dev/null || echo 0)"
@@ -86,6 +87,7 @@ while read -r d; do
   if have waybackurls; then
     echo "$d" | waybackurls 2>/dev/null >> "$OUTDIR/all_urls.txt" || true
   fi
+  sleep 3
 done < "$TARGETS_FILE"
 
 sort -u "$OUTDIR/all_urls.txt" -o "$OUTDIR/all_urls.txt" 2>/dev/null
@@ -115,7 +117,7 @@ log "=== [5/5] Vulnerability Scanning ==="
 if have nuclei && [ -s "$OUTDIR/live_urls.txt" ]; then
   nuclei -l "$OUTDIR/live_urls.txt" \
     -silent -severity critical,high,medium \
-    -c 25 -rl 150 \
+    -c 10 -rl 30 -timeout 10 \
     -o "$OUTDIR/nuclei_findings.txt" 2>/dev/null || true
   log "  ✅ nuclei findings: $(wc -l < "$OUTDIR/nuclei_findings.txt" 2>/dev/null || echo 0)"
 else
