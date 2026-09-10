@@ -103,16 +103,11 @@ jobs:
           fi
           cat targets.txt
 
-      - name: Run recon pipeline
+      - name: Run hunt pipeline
         run: |
           export PATH="$PATH:$(go env GOPATH)/bin:$HOME/.local/bin"
-          while read -r domain; do
-            [ -z "$domain" ] && continue
-            echo "=== Hunting: $domain ==="
-            subfinder -d "$domain" -silent > output/subs.txt || true
-            httpx -l output/subs.txt -silent -o output/live.txt || true
-            nuclei -l output/live.txt -silent -o output/nuclei.txt || true
-          done < targets.txt
+          chmod +x run_hunt.sh
+          ./run_hunt.sh targets.txt
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
