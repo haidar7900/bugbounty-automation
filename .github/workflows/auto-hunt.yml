@@ -71,6 +71,7 @@ jobs:
           go install github.com/tomnomnom/assetfinder@latest
           go install github.com/lc/gau/v2/cmd/gau@latest
           go install github.com/hahwul/dalfox/v2@latest
+          go install github.com/Emoe/kxss@latest
 
           nuclei -update-templates -silent || true
 
@@ -83,7 +84,7 @@ jobs:
       - name: Verify critical tools available
         run: |
           export PATH="$PATH:$(go env GOPATH)/bin:$HOME/.local/bin"
-          for t in subfinder httpx katana nuclei ffuf gau dalfox; do
+          for t in subfinder httpx katana nuclei ffuf gau dalfox kxss; do
             if command -v $t >/dev/null 2>&1; then
               echo "OK: $t"
             else
