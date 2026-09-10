@@ -99,9 +99,9 @@ jobs:
           mkdir -p output
           if [ -n "${{ github.event.inputs.target }}" ]; then
             echo "${{ github.event.inputs.target }}" > output/targets_used.txt
-          elif [ -f config/targets_filtered.txt ]; then
-            echo "Using config/targets_filtered.txt (filtered list)"
-            head -n "$TARGETS_LIMIT" config/targets_filtered.txt > output/targets_used.txt
+          elif [ -f config/test_targets.txt ]; then
+            echo "Using config/test_targets.txt (test run)"
+            cat config/test_targets.txt > output/targets_used.txt
           elif [ -f config/targets.txt ]; then
             echo "Using config/targets.txt (sampled $TARGETS_LIMIT)"
             head -n "$TARGETS_LIMIT" config/targets.txt > output/targets_used.txt

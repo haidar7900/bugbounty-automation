@@ -49,7 +49,7 @@ while read -r d; do
   if have amass; then
     timeout 120 amass enum -passive -d "$d" -silent 2>/dev/null >> "$OUTDIR/all_subs.txt" || true
   fi
-  sleep 3
+  sleep 8
 done < "$TARGETS_FILE"
 
 sort -u "$OUTDIR/all_subs.txt" -o "$OUTDIR/all_subs.txt"
@@ -87,7 +87,7 @@ while read -r d; do
   if have waybackurls; then
     echo "$d" | waybackurls 2>/dev/null >> "$OUTDIR/all_urls.txt" || true
   fi
-  sleep 3
+  sleep 8
 done < "$TARGETS_FILE"
 
 sort -u "$OUTDIR/all_urls.txt" -o "$OUTDIR/all_urls.txt" 2>/dev/null
@@ -116,7 +116,7 @@ log "=== [5/5] Vulnerability Scanning ==="
 # Nuclei
 if have nuclei && [ -s "$OUTDIR/live_urls.txt" ]; then
   nuclei -l "$OUTDIR/live_urls.txt" \
-    -silent -severity critical,high,medium \
+    -silent -severity critical,high -tags cve,exposure \
     -c 10 -rl 30 -timeout 10 \
     -o "$OUTDIR/nuclei_findings.txt" 2>/dev/null || true
   log "  ✅ nuclei findings: $(wc -l < "$OUTDIR/nuclei_findings.txt" 2>/dev/null || echo 0)"
