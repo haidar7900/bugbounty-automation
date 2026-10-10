@@ -8,10 +8,6 @@
 	path = tools/BBOT
 	url = https://github.com/blacklanternsecurity/bbot.git
 
-[submodule "tools/Pinakastra"]
-	path = tools/Pinakastra
-	url = https://github.com/who0xac/Pinakastra.git
-
 [submodule "tools/ParamSpecter-Crawler"]
 	path = tools/ParamSpecter-Crawler
 	url = https://github.com/Boltx099/ParamSpecter-Crawler.git
