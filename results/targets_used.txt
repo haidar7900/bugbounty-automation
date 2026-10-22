@@ -1,0 +1,10 @@
+data-api.coindesk.com
+tools-api.cryptocompare.com
+mobileapi.afterpay.com
+portalapi.us.afterpay.com
+developers.afterpay.com
+mobileapi.clearpay.com
+portalapi.eu.clearpay.co.uk
+api.clearpay.com
+api.aiven.io
+falcon-bug-bounty-flag-pgsql-dev-sandbox.e.aivencloud.com

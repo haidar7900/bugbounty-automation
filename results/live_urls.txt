@@ -1,0 +1,9 @@
+https://api.aiven.io
+https://api.clearpay.com
+https://data-api.coindesk.com
+https://developers.afterpay.com
+https://digitalocean-org4249cc60304.api.aiven.io
+https://mobileapi.afterpay.com
+https://portalapi.eu.clearpay.co.uk
+https://portalapi.us.afterpay.com
+https://tools-api.cryptocompare.com
