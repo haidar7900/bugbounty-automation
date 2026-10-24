@@ -1,7 +1,6 @@
 https://data-api.coindesk.com [401] [cloudflare] [Cloudflare,Cloudflare Bot Management]
 https://portalapi.us.afterpay.com [404] [cloudflare] [Cloudflare,Cloudflare Bot Management,Envoy,HSTS]
 https://api.clearpay.com [530] [cloudflare] [Cloudflare]
-https://api.aiven.io [301] [301 Moved Permanently] [cloudflare] [Cloudflare,Cloudflare Browser Insights,HSTS,HTTP/3]
 https://portalapi.eu.clearpay.co.uk [404] [cloudflare] [Cloudflare,Cloudflare Bot Management,Envoy,HSTS]
 https://mobileapi.afterpay.com [404] [cloudflare] [Cloudflare,Cloudflare Bot Management,Envoy,HSTS]
 https://digitalocean-org4249cc60304.api.aiven.io [301] [301 Moved Permanently] [cloudflare] [Cloudflare,Cloudflare Browser Insights,HSTS,HTTP/3]
