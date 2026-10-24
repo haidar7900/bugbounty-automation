@@ -1,3 +1,4 @@
+https://api.aiven.io
 https://api.clearpay.com
 https://data-api.coindesk.com
 https://developers.afterpay.com
