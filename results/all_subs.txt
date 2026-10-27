@@ -1,3 +1,4 @@
+api.aiven.io
 data-api.coindesk.com
 developers.afterpay.com
 digitalocean-org4249cc60304.api.aiven.io
