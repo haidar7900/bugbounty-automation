@@ -1,4 +1,4 @@
-https://api.clearpay.com
+https://api.aiven.io
 https://data-api.coindesk.com
 https://developers.afterpay.com
 https://digitalocean-org4249cc60304.api.aiven.io
