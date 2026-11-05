@@ -1,8 +1,8 @@
-api.aiven.io
 data-api.coindesk.com
 developers.afterpay.com
 digitalocean-org4249cc60304.api.aiven.io
 mobileapi.afterpay.com
+portalapi.eu.clearpay.co.uk
 portalapi.us.afterpay.com
 tools-api.cryptocompare.com
 ts-admin.api.aiven.io
