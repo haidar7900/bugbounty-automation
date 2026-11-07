@@ -1,6 +1,5 @@
-https://portalapi.us.afterpay.com [404] [cloudflare] [Cloudflare,Cloudflare Bot Management,Envoy,HSTS]
 https://data-api.coindesk.com [401] [cloudflare] [Cloudflare,Cloudflare Bot Management]
-https://api.clearpay.com [530] [cloudflare] [Cloudflare]
+https://portalapi.us.afterpay.com [404] [cloudflare] [Cloudflare,Cloudflare Bot Management,Envoy,HSTS]
 https://developers.afterpay.com [307] [cloudflare] [Cloudflare,Cloudflare Bot Management,HSTS,HTTP/3]
 https://portalapi.eu.clearpay.co.uk [404] [cloudflare] [Cloudflare,Cloudflare Bot Management,Envoy,HSTS]
 https://mobileapi.afterpay.com [404] [cloudflare] [Cloudflare,Cloudflare Bot Management,Envoy,HSTS]
