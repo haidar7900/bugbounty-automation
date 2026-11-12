@@ -1,3 +1,4 @@
+api.aiven.io
 api.clearpay.com
 data-api.coindesk.com
 developers.afterpay.com
@@ -7,7 +8,4 @@ portalapi.eu.clearpay.co.uk
 portalapi.us.afterpay.com
 tools-api.cryptocompare.com
 ts-admin.api.aiven.io
-ts-admin1.api.aiven.io
-www.api.aiven.io
-www.ts-admin.api.aiven.io
-www7.api.aiven.io
+www.tools-api.cryptocompare.com
