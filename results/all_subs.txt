@@ -1,5 +1,3 @@
-api.aiven.io
-api.clearpay.com
 data-api.coindesk.com
 developers.afterpay.com
 digitalocean-org4249cc60304.api.aiven.io
